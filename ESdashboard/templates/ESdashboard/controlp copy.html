@@ -1,0 +1,197 @@
+{% load static %}
+<!DOCTYPE html>
+<html data-bs-theme="light" lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>Contacts - Brand</title>
+    <link rel="stylesheet" href="{% static 'ESdashboard/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800&amp;display=swap">
+    <link rel="stylesheet" href="{% static 'ESdashboard/css/bs-theme-overrides.css' %}">
+    <link rel="stylesheet" href="{% static 'ESdashboard/css/Icon-Button.css' %}">
+    <link rel="stylesheet" href="{% static 'ESdashboard/fonts/font-awesome.min.css' %}">
+
+</head>
+
+<body class="text-center">
+    <nav class="navbar navbar-expand-md sticky-top py-3 navbar-dark" id="mainNav">
+        <div class="container"><a class="navbar-brand d-flex align-items-center" href="/"><span class="bs-icon-sm bs-icon-circle bs-icon-primary shadow d-flex justify-content-center align-items-center me-2 bs-icon" style="color: var(--bs-body-bg);background: var(--bs-secondary);"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 16 16" class="bi bi-bezier">
+                        <path fill-rule="evenodd" d="M0 10.5A1.5 1.5 0 0 1 1.5 9h1A1.5 1.5 0 0 1 4 10.5v1A1.5 1.5 0 0 1 2.5 13h-1A1.5 1.5 0 0 1 0 11.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm10.5.5A1.5 1.5 0 0 1 13.5 9h1a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5zm1.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zM6 4.5A1.5 1.5 0 0 1 7.5 3h1A1.5 1.5 0 0 1 10 4.5v1A1.5 1.5 0 0 1 8.5 7h-1A1.5 1.5 0 0 1 6 5.5zM7.5 4a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z"></path>
+                        <path d="M6 4.5H1.866a1 1 0 1 0 0 1h2.668A6.517 6.517 0 0 0 1.814 9H2.5c.123 0 .244.015.358.043a5.517 5.517 0 0 1 3.185-3.185A1.503 1.503 0 0 1 6 5.5zm3.957 1.358A1.5 1.5 0 0 0 10 5.5v-1h4.134a1 1 0 1 1 0 1h-2.668a6.517 6.517 0 0 1 2.72 3.5H13.5c-.123 0-.243.015-.358.043a5.517 5.517 0 0 0-3.185-3.185z"></path>
+                    </svg></span><span>Equal Systems</span></a><button data-bs-toggle="collapse" class="navbar-toggler" data-bs-target="#navcol-1"><span class="visually-hidden">Toggle navigation</span><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navcol-1">
+                <ul class="navbar-nav mx-auto">
+                    <li class="nav-item"><a class="nav-link" href="{% url 'billing' %}">Billing</a></li>
+                    <li class="nav-item"><a class="nav-link" href="services.html">Catatan</a></li>
+                    <li class="nav-item"></li>
+                    <li class="nav-item"><a class="nav-link" href="pricing.html">Reports</a></li>
+                    <li class="nav-item"><a class="nav-link" href="contacts.html">Members</a></li>
+                    <li class="nav-item"><a class="nav-link link-danger" href="contacts.html">Tutup Hari Ini</a></li>
+                </ul><a class="btn btn-primary shadow" role="button" href="signup.html" style="background: var(--bs-secondary);border-style: solid;border-color: var(--bs-secondary);">Admin Panel</a>
+            </div>
+        </div>
+    </nav>
+    <div style="width: 50%;margin-left: 25%;"><button class="btn btn-success d-block icon-button w-100" type="button" style="height: 58.4px;margin-top: 31px;margin-bottom: 31px;padding-top: 5.6px;background: var(--bs-success);"><i class="fa fa-power-off fs-1 text-dark"></i><span class="fs-2 text-dark" style="margin-bottom: 0px;padding-bottom: 0px;margin-top: 0px;">Mulai&nbsp;</span></button></div>
+    <div class="text-center" style="width: 100%;margin: 0px;margin-top: 5px;margin-bottom: 10px;">
+        <div class="container">
+            <div class="row text-center" style="margin-right: 0px;margin-top: 4px;">
+                {% for table in tables %}
+                <div class="col-md-3 text-center text-bg-dark" style="height: 100%;width: 19.5%;margin-left: 5px;border: 5.4px solid var(--bs-secondary-text-emphasis);">
+                    <div class="row text-center" style="width: 100%;text-align: center;">
+                        <div class="col text-center" style="width: 100%;height: 33%;padding-right: 0px;padding-left: 0px;text-align: center;margin-left: 24px;">
+                            <div class="text-center" style="width: 100%;"><label class="form-label fs-1 text-center">Meja {{ i|add:1 }}</label></div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col"><button data-relay-id="{{ i }}" data-state="1" id="meja {{ i|add:1 }}" name="meja {{ i|add:1 }}" class="btn btn-primary btn-sm text-center d-block icon-button w-100" type="button" style="background: var(--bs-secondary);margin: auto;margin-top: 5px;height: 50%;padding: 5px;">On</button></div>
+                        <div class="col"><button data-relay-id="{{ i }}" data-state="0" id="meja {{ i|add:1 }} off" name="meja {{ i|add:1 }} off" class="btn btn-primary btn-sm text-center d-block icon-button w-100" type="button" style="background: var(--bs-secondary);margin: auto;margin-top: 5px;height: 50%;padding: 5px;">Off</button></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" role="dialog" tabindex="-1" id="modal-3">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header text-success" style="border-style: none;">
+                    <h4 class="modal-title">Open Meja 2</h4><button class="btn-close text-bg-danger" type="button" aria-label="Close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="container">
+                        <div class="row">
+                            <div class="col-md-3" style="width: 50%;">
+                                <div class="dropdown"><button class="btn btn-primary dropdown-toggle link-dark" aria-expanded="false" data-bs-toggle="dropdown" type="button" style="background: var(--bs-secondary);border-color: var(--bs-secondary);margin-top: 19px;width: 213.238px;">Rate</button>
+                                    <div class="dropdown-menu"><a class="dropdown-item" href="#">Standard</a><a class="dropdown-item" href="#">Laddies FREE</a><a class="dropdown-item" href="#">Malming</a></div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 offset-xl-0 text-center" style="width: 50%;"><label class="form-label fs-5" style="display: block;">durasi Main</label>
+                                <div style="width: 100%;display: inline;margin-right: 5px;"><input type="number" style="width: 45.2px;background: var(--bs-form-valid-color);border-radius: 13px;border: 1.6px solid var(--bs-form-valid-color) ;" min="00" placeholder="00" name="Ohour"><label class="form-label" style="margin-left: 5px;">:</label></div>
+                                <div style="width: 100%;display: inline;margin-right: 0px;"><input type="number" style="width: 45.2px;background: var(--bs-form-valid-color);border-radius: 13px;border: 1.6px solid var(--bs-form-valid-color) ;" min="00" placeholder="00" name="Ominute"></div>
+                            </div>
+                        </div>
+                        <div class="row" style="margin-top: 31px;">
+                            <div class="col-md-3" style="width: 50%;">
+                                <div class="dropdown"><button class="btn btn-primary dropdown-toggle link-dark" aria-expanded="false" data-bs-toggle="dropdown" type="button" style="background: var(--bs-secondary);border-color: var(--bs-secondary);margin-top: 22px;width: 213.45px;">Member</button>
+                                    <div class="dropdown-menu"><a class="dropdown-item" href="#">New</a><a class="dropdown-item" href="#">Bagus</a><a class="dropdown-item" href="#">dian</a></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="border-style: none;"><button class="btn btn-dark" type="button" style="background: var(--bs-form-valid-color);color: var(--bs-btn-border-color);">Open</button></div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" role="dialog" tabindex="-1" data-bs-backdrop="static" id="modal-2">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header" style="border-style: none;">
+                    <h4 class="modal-title fw-bold text-danger">Stop Meja 1</h4><button class="btn-close text-bg-danger" type="button" aria-label="Close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th class="text-light" style="border-color: var(--bs-secondary);">Item</th>
+                                        <th class="text-light" style="border-color: var(--bs-secondary);">Quantity</th>
+                                        <th class="text-light" style="border-color: var(--bs-secondary);">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="text-light" style="border-style: none;border-color: var(--bs-secondary-bg-subtle);">Es Teh</td>
+                                        <td class="text-light" style="border-style: none;border-color: var(--bs-secondary-bg-subtle);">5</td>
+                                        <td class="text-light" style="border-style: none;border-color: var(--bs-secondary-bg-subtle);">25.000</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-light" style="border-style: none;border-color: var(--bs-secondary-bg-subtle);">Bintang</td>
+                                        <td class="text-light" style="border-style: none;border-color: var(--bs-secondary-bg-subtle);">2</td>
+                                        <td class="text-light" style="border-style: none;border-color: var(--bs-secondary-bg-subtle);">60.000</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold text-success" style="border-style: none;border-color: var(--bs-secondary);border-top: 1px solid var(--bs-secondary) ;">TOTAL</td>
+                                        <td class="text-success" style="border-style: none;border-color: var(--bs-secondary);border-top: 1px solid var(--bs-secondary) ;"></td>
+                                        <td class="fw-bold text-success" style="border-style: none;border-color: var(--bs-secondary);border-top: 1px solid var(--bs-secondary) ;border-bottom-style: none;">85.000</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer" style="border-style: none;"><button class="btn btn-light" type="button" data-bs-dismiss="modal" style="background: var(--bs-secondary);border-color: var(--bs-secondary);">CETAK</button><button class="btn btn-light" type="button" data-bs-dismiss="modal" style="background: var(--bs-form-valid-color);border-color: var(--bs-form-valid-border-color);">BAYAR</button><button class="btn btn-primary link-dark" type="button" style="background: var(--bs-form-invalid-border-color);border-color: var(--bs-form-invalid-color);">STOP</button></div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" role="dialog" tabindex="-1" id="modal-1">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header" style="border-style: none;">
+                    <h4 class="modal-title">Tambah Belanjanan Meja 1</h4><button class="btn-close text-bg-danger" type="button" aria-label="Close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="border-style: none;border-top-style: none;border-bottom-style: none;">
+                    <div class="container">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="dropdown" style="width: 100%;"><button class="btn btn-secondary btn-sm dropdown-toggle" aria-expanded="false" data-bs-toggle="dropdown" type="button" style="width: 100%;padding-left: 9px;">Minuman</button>
+                                    <div class="dropdown-menu"><a class="dropdown-item" href="#"><input type="search" style="width: 100%;border-radius: 9px;border-style: solid;border-color: var(--bs-secondary);border-top-style: solid;" placeholder="Cari..." data-bs-theme="dark"></a><a class="dropdown-item" href="#">Es Teh</a><a class="dropdown-item" href="#">Bintang</a><a class="dropdown-item" href="#">Es Jeruk</a></div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="dropdown" style="width: 100%;"><button class="btn btn-secondary btn-sm dropdown-toggle" aria-expanded="false" data-bs-toggle="dropdown" type="button" style="width: 100%;padding-left: 9px;">Makanan</button>
+                                    <div class="dropdown-menu"><a class="dropdown-item" href="#"><input type="search" style="width: 100%;border-radius: 9px;border-style: solid;border-color: var(--bs-secondary);border-top-style: solid;" placeholder="Cari..." data-bs-theme="dark"></a><a class="dropdown-item" href="#">Es Teh</a><a class="dropdown-item" href="#">Bintang</a><a class="dropdown-item" href="#">Es Jeruk</a></div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="dropdown" style="width: 100%;"><button class="btn btn-secondary btn-sm dropdown-toggle" aria-expanded="false" data-bs-toggle="dropdown" type="button" style="width: 100%;padding-left: 9px;">Rokok</button>
+                                    <div class="dropdown-menu"><a class="dropdown-item" href="#"><input type="search" style="width: 100%;border-radius: 9px;border-style: solid;border-color: var(--bs-secondary);border-top-style: solid;" placeholder="Cari..." data-bs-theme="dark"></a><a class="dropdown-item" href="#">Es Teh</a><a class="dropdown-item" href="#">Bintang</a><a class="dropdown-item" href="#">Es Jeruk</a></div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="dropdown" style="width: 100%;"><button class="btn btn-secondary btn-sm dropdown-toggle" aria-expanded="false" data-bs-toggle="dropdown" type="button" style="width: 100%;padding-left: 9px;">Lainnya</button>
+                                    <div class="dropdown-menu"><a class="dropdown-item" href="#"><input type="search" style="width: 100%;border-radius: 9px;border-style: solid;border-color: var(--bs-secondary);border-top-style: solid;" placeholder="Cari..." data-bs-theme="dark"></a><a class="dropdown-item" href="#">Es Teh</a><a class="dropdown-item" href="#">Bintang</a><a class="dropdown-item" href="#">Es Jeruk</a></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer"><input type="number" placeholder="Jumlah" style="width: 25%;background: var(--bs-secondary);color: var(--bs-body-color);border-radius: 17px;border-color: var(--bs-secondary);"><button class="btn btn-success link-dark" type="button">Tambah</button></div>
+            </div>
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('button[name^="meja"]').click(function() {
+                var relayId = $(this).data('relay-id');  // Access directly from button
+                var state = $(this).data('state');      // Access directly from button
+                var tableName = $(this).attr('name');
+                console.log("Name: " + tableName);
+                console.log("Relay: " + relayId );
+                console.log("State: " + state);
+
+                $.ajax({
+                    url: "{% url 'control_relay' %}",
+                    type: 'POST',
+                    data: {
+                        'relay_id': relayId,
+                        'state': state
+                    },
+                    success: function(response) {
+                        console.log('Response:', response);
+                    },
+                    error: function(error) {
+                        console.log('Error:', error);
+                    }
+                });
+            });
+        });
+    </script>
+    <script src="{% static 'ESdashboard/bootstrap/js/bootstrap.min.js' %}"></script>
+    <script src="{% static 'ESdashboard/js/bold-and-dark.js' %}"></script>
+</body>
+
+</html>
