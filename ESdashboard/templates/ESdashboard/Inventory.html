@@ -1,16 +1,18 @@
+{% load static %}
+{% load humanize %}
 <!DOCTYPE html>
 <html data-bs-theme="light" lang="en">
 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
-    <title>Sign up - Brand</title>
-    <link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css">
+    <title>Inventory - Brand</title>
+    <link rel="stylesheet" href="{% static 'ESdashboard/css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800&amp;display=swap">
-    <link rel="stylesheet" href="assets/css/bs-theme-overrides.css">
+    <link rel="stylesheet" href="{% static 'ESdashboard/css/bs-theme-overrides.css' %}">
     <link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.5/css/buttons.dataTables.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.10.21/css/dataTables.bootstrap4.min.css">
-    <link rel="stylesheet" href="assets/css/Icon-Button.css">
+    <link rel="stylesheet" href="{% static 'ESdashboard/css/Icon-Button.css' %}">
 </head>
 
 <body>
@@ -21,11 +23,10 @@
                     </svg></span><span>Equal Systems</span></a><button data-bs-toggle="collapse" class="navbar-toggler" data-bs-target="#navcol-1"><span class="visually-hidden">Toggle navigation</span><span class="navbar-toggler-icon"></span></button>
             <div class="collapse navbar-collapse" id="navcol-1">
                 <ul class="navbar-nav mx-auto">
-                    <li class="nav-item"><a class="nav-link" href="index.html">Today</a></li>
-                    <li class="nav-item"><a class="nav-link" href="services.html">Management</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'adminp' %}">Today</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'inventory' %}">Inventory</a></li>
                     <li class="nav-item"></li>
-                    <li class="nav-item"><a class="nav-link" href="pricing.html">Reports</a></li>
-                    <li class="nav-item"><a class="nav-link" href="contacts.html">Members</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'reports' %}">Reports</a></li>
                 </ul><a class="btn btn-primary link-dark shadow" role="button" href="signup.html" style="background: var(--bs-secondary);border-style: solid;border-color: var(--bs-secondary);">Admin Panel</a>
             </div>
         </div>
@@ -33,42 +34,151 @@
     <section class="py-5">
         <div class="container py-5">
             <h1 class="text-center text-success">Inventory</h1>
+            <button type="button" class="btn btn-success mb-3" data-bs-toggle="modal" data-bs-target="#addItemModal">Add New Item</button>
         </div>
         <div class="container">
             <div class="table-responsive">
                 <table class="table">
                     <thead>
                         <tr>
-                            <th class="text-primary" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);width: 20%;">Catagory</th>
-                            <th class="text-primary" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);width: 20%;">Name</th>
-                            <th class="text-primary" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);width: 20%;">Stock</th>
-                            <th class="text-primary" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);width: 20%;">Cost</th>
-                            <th class="text-primary" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);width: 20%;">Price</th>
+                            <th class="text-primary">Category</th>
+                            <th class="text-primary">Name</th>
+                            <th class="text-primary">Stock</th>
+                            <th class="text-primary">Cost</th>
+                            <th class="text-primary">Price</th>
+                            <th class="text-primary">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
+                        {% for item in inventory_items %}
                         <tr>
-                            <td class="text-info" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);">Cell 1</td>
-                            <td class="text-info" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);">Cell 2</td>
-                            <td class="text-info" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);">Cell 2</td>
-                            <td class="text-info" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);">Cell 2</td>
-                            <td class="text-info" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);">Cell 2</td>
+                            <td>{{ item.catagory.name }}</td>
+                            <td>{{ item.product_name }}</td>
+                            <td>{{ item.stock }}</td>
+                            <td>{{ item.cost }}</td>
+                            <td>{{ item.price }}</td>
+                            <td>
+                                <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#editItemModal{{ item.id }}">Edit</button>
+                                <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteItemModal{{ item.id }}">Delete</button>
+                            </td>
                         </tr>
-                        <tr>
-                            <td class="text-info" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);">Cell 3</td>
-                            <td class="text-info" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);">Cell 4</td>
-                            <td class="text-info" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);">Cell 4</td>
-                            <td class="text-info" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);">Cell 4</td>
-                            <td class="text-info" style="border-width: 3px;border-color: var(--bs-secondary-text-emphasis);">Cell 4</td>
-                        </tr>
+
+                        <!-- Edit Modal -->
+                        <div class="modal fade" id="editItemModal{{ item.id }}" tabindex="-1" aria-labelledby="editItemLabel" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Edit Item</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <form method="post" action="{% url 'edit_inventory' item.id %}">
+                                        {% csrf_token %}
+                                        <div class="modal-body">
+                                            <div class="form-group">
+                                                <label>Product Name</label>
+                                                <input type="text" class="form-control" name="product_name" value="{{ item.product_name }}">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Stock</label>
+                                                <input type="number" class="form-control" name="stock" value="{{ item.stock }}">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Cost</label>
+                                                <input type="number" class="form-control" name="cost" value="{{ item.cost }}">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Price</label>
+                                                <input type="number" class="form-control" name="price" value="{{ item.price }}">
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Category</label>
+                                                <select name="catagory" class="form-control">
+                                                    {% for cat in item.user.invcatagory_set.all %}
+                                                        <option value="{{ cat.id }}" {% if cat == item.catagory %}selected{% endif %}>{{ cat.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                            <button type="submit" class="btn btn-primary">Save changes</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Delete Modal -->
+                        <div class="modal fade" id="deleteItemModal{{ item.id }}" tabindex="-1" aria-labelledby="deleteItemLabel" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Delete Item</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        Are you sure you want to delete {{ item.product_name }}?
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                        <a href="{% url 'delete_inventory' item.id %}" class="btn btn-danger">Delete</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
     </section>
+    <!-- Add Item Modal -->
+    <div class="modal fade" id="addItemModal" tabindex="-1" aria-labelledby="addItemLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post" action="{% url 'add_inventory' %}">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>Product Name</label>
+                            <input type="text" class="form-control" name="product_name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Stock</label>
+                            <input type="number" class="form-control" name="stock" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Price</label>
+                            <input type="number" class="form-control" name="price" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Cost</label>
+                            <input type="number" class="form-control" name="cost" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select name="catagory" class="form-control">
+                                {% for cat in request.user.invcatagory_set.all %}
+                                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Add Item</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     <footer class="bg-dark"></footer>
-    <script src="assets/bootstrap/js/bootstrap.min.js"></script>
-    <script src="assets/js/bs-init.js"></script>
+    <script src="{% static 'ESdashboard/js/bootstrap.min.js' %}"></script>
+    <script src="{% static 'ESdashboard/js/bs-init.js' %}"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.6.0/umd/popper.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.10.21/js/jquery.dataTables.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.10.21/js/dataTables.bootstrap4.min.js"></script>
@@ -79,8 +189,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
     <script src="https://cdn.datatables.net/buttons/1.6.5/js/buttons.html5.min.js"></script>
     <script src="https://cdn.datatables.net/buttons/1.6.5/js/buttons.print.min.js"></script>
-    <script src="assets/js/DataTable---Fully-BSS-Editable-style.js"></script>
-    <script src="assets/js/bold-and-dark.js"></script>
+    <script src="{% static 'ESdashboard/js/bold-and-dark.js' %}"></script>
 </body>
 
 </html>

@@ -137,12 +137,14 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="modal-3-label">Open Meja</h5>
+                    <h5 class="modal-title" id="modal-3-label">Open Meja <span id="modal-table-number"></span> - <span id="modal-customer-name"></span></h5>
+
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="container">
                         <div class="row">
+                            <!-- Rate Dropdown -->
                             <div class="col-md-3" style="width: 50%;">
                                 <div class="dropdown">
                                     <button class="btn btn-primary dropdown-toggle link-dark" aria-expanded="false" data-bs-toggle="dropdown" type="button" style="background: var(--bs-secondary);border-color: var(--bs-secondary);margin-top: 19px;width: 213.238px;">Rate</button>
@@ -155,39 +157,60 @@
                                 <input type="hidden" id="selected-rate-id" name="selected-rate-id" value="">
                             </div>
                             <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
-                            <div class="col-md-3 offset-xl-0 text-center" style="width: 50%;"><label class="form-label fs-5" style="display: block;">durasi Main</label>
-                                <div style="width: 100%;display: inline;margin-right: 5px;"><input id="timeh" type="number" style="width: 45.2px;background: var(--bs-form-valid-color);border-radius: 13px;border: 1.6px solid var(--bs-form-valid-color) ;" hour="00" placeholder="00" name="Ohour"><label class="form-label" style="margin-left: 5px;">:</label></div>
-                                <div style="width: 100%;display: inline;margin-right: 0px;"><input id="timem" type="number" style="width: 45.2px;background: var(--bs-form-valid-color);border-radius: 13px;border: 1.6px solid var(--bs-form-valid-color) ;" min="00" placeholder="00" name="Ominute"></div>
+    
+                            <!-- Duration Input -->
+                            <div class="col-md-3 offset-xl-0 text-center" style="width: 50%;">
+                                <label class="form-label fs-5" style="display: block;">Durasi Main</label>
+                                <div style="width: 100%;display: inline;margin-right: 5px;">
+                                    <input id="timeh" type="number" style="width: 45.2px;background: var(--bs-form-valid-color);border-radius: 13px;border: 1.6px solid var(--bs-form-valid-color);" hour="00" placeholder="00" name="Ohour">
+                                    <label class="form-label" style="margin-left: 5px;">:</label>
+                                </div>
+                                <div style="width: 100%;display: inline;margin-right: 0px;">
+                                    <input id="timem" type="number" style="width: 45.2px;background: var(--bs-form-valid-color);border-radius: 13px;border: 1.6px solid var(--bs-form-valid-color);" min="00" placeholder="00" name="Ominute">
+                                </div>
                             </div>
                         </div>
+    
+                        <!-- Member Dropdown and Customer Name Input -->
                         <div class="row" style="margin-top: 31px;">
                             <div class="col-md-3" style="width: 50%;">
-                                <div class="dropdown"><button class="btn btn-primary dropdown-toggle link-dark" aria-expanded="false" data-bs-toggle="dropdown" type="button" style="background: var(--bs-secondary);border-color: var(--bs-secondary);margin-top: 22px;width: 213.45px;">Member</button>
-                                    <div class="dropdown-menu"><a class="dropdown-item" href="#">New</a><a class="dropdown-item" href="#">Bagus</a><a class="dropdown-item" href="#">dian</a></div>
+                                <div class="dropdown">
+                                    <button class="btn btn-primary dropdown-toggle link-dark" aria-expanded="false" data-bs-toggle="dropdown" type="button" style="background: var(--bs-secondary);border-color: var(--bs-secondary);margin-top: 22px;width: 213.45px;">Member</button>
+                                    <div class="dropdown-menu">
+                                        <!-- Customer Name Input Field -->
+                                        <input type="text" id="customer-name" class="form-control mt-2" placeholder="Member Name...">
+                                        <a class="dropdown-item" href="#">New</a>
+                                        <a class="dropdown-item" href="#">Bagus</a>
+                                        <a class="dropdown-item" href="#">Dian</a>
+                                    </div>
                                 </div>
+                                
                             </div>
                         </div>
                     </div>
                 </div>
+                
                 <div class="modal-footer" style="border-style: none;">
                     <button class="btn btn-dark open-table-btn" type="button" 
-                    style="background: var(--bs-form-valid-color);color: var(--bs-btn-border-color);"
-                    data-table-id=""
-                    data-relay-id=""
-                    data-start-table-url=""
-                    data-settime=""
-                    data-url="{% url 'control_relay' %}"
-                    onclick="handleTableStateChange3(this)">Open</button>
+                        style="background: var(--bs-form-valid-color);color: var(--bs-btn-border-color);"
+                        data-table-id=""
+                        data-relay-id=""
+                        data-start-table-url=""
+                        data-settime=""
+                        data-customer-name=""
+                        data-url="{% url 'control_relay' %}"
+                        onclick="handleTableStateChange3(this)">Open</button>
                     <button id="hidden-close-button" type="button" class="d-none" data-bs-dismiss="modal"></button>
                 </div>            
             </div>
         </div>
     </div>
+    
     <div class="modal fade" id="modal-2" tabindex="-1" aria-labelledby="modal-2-label" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="modal-2-label">Stop Meja</h5>
+                    <h5 class="modal-title" id="modal-2-label">Stop Meja <span id="modal-table-number"></span></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">

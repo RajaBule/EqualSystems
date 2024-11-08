@@ -17,13 +17,15 @@ import json
 from django.utils import timezone
 from pytz import timezone as tz
 from django.db.models import Sum, DateTimeField
-from django.db.models.functions import TruncMinute
+from django.db.models.functions import TruncMinute, ExtractMonth, TruncMonth, TruncWeek
+import serial
+from PIL import Image
 
 timezonejkt = tz('Asia/Jakarta')
 counter_value = 0
 tbtotal = 0
 
-ESP32_URL = 'http://192.168.0.104/relay/'
+ESP32_URL = 'http://192.168.18.90/relay/'
 
 # TANEM - 192.168.18.90
 # HOME - ESP32_URL = 'http://192.168.0.104/relay/'
@@ -35,6 +37,8 @@ ESP32_URL = 'http://192.168.0.104/relay/'
 # - EQUAL gateway: 192.168.1.1
 #const char* ssid = "De tower Bar";
 #const char* password = "tower1234";
+
+
 
 def sign_up(request):
     if request.method == 'POST':
@@ -203,7 +207,8 @@ def control_relay(request):
             table.save()
 
             duration_minutes = int(table.duration.total_seconds() / 60)  # Convert to minutes
-
+            
+            #create bill item for customer's bill to charge for table use
             BillItem.objects.create(
                 user=table.user,
                 bill=bill,
@@ -312,7 +317,13 @@ def set_all_relays_off(request):
 def start_table(request, table_id):
     print(table_id)
     table = Table.objects.get(id=table_id)
-    
+        
+    if request.POST.get('customer_name'):
+        customer_name = request.POST.get('customer_name')
+    else:
+        customer_name = 'NoUser'
+        
+    print(customer_name)
     # Check for active business day
     business_day = BusinessDay.objects.filter(user=request.user, end_date__isnull=True).first()
     
@@ -321,8 +332,9 @@ def start_table(request, table_id):
         business_day = BusinessDay.objects.create(user=request.user)
 
     # Create a new bill for this table
-    new_bill = Bill.objects.create(user=table.user, table=table, business_day=business_day, total_amount=0.00)
+    new_bill = Bill.objects.create(user=table.user, table=table, business_day=business_day, customer_name=customer_name, total_amount=0.00)
     new_bill.start_time = table.start_time
+    
     new_bill.save()
     return JsonResponse({'status': 'success'})
 
@@ -447,7 +459,7 @@ def get_bill_data(request, bill_id):
     bill_data = {
         'table_number': bill.table.table_number,
         'items': [{
-            'product_name': item.product_name,  # Assuming there's a `product.name` field in your BillItem model
+            'product_name': item.product_name,
             'quantity': item.quantity,
             'line_total': item.linetot
         } for item in items],
@@ -572,7 +584,206 @@ def get_chart_data(request):
         'labels': bills_labels,
         'data': bills_data,
     })
+
+@login_required
+def inventory(request):
+    # Fetch the inventory items for the logged-in user
+    inventory_items = Inventory.objects.filter(user=request.user)
+    context = {'inventory_items': inventory_items}
+    return render(request, 'ESdashboard/inventory.html', context)
+
+@login_required
+def add_inventory(request):
+    if request.method == "POST":
+        product_name = request.POST['product_name']
+        stock = request.POST['stock']
+        price = request.POST['price']
+        cost = request.POST['cost']
+        catagory_id = request.POST['catagory']
+        catagory = get_object_or_404(InvCatagory, id=catagory_id, user=request.user)
+        Inventory.objects.create(user=request.user, product_name=product_name, stock=stock, cost=cost, price=price, catagory=catagory)
+    return redirect('inventory')
+
+@login_required
+def edit_inventory(request, item_id):
+    item = get_object_or_404(Inventory, id=item_id, user=request.user)
+    if request.method == "POST":
+        item.product_name = request.POST['product_name']
+        item.stock = request.POST['stock']
+        item.price = request.POST['price']
+        item.cost = request.POST['cost']
+        catagory_id = request.POST['catagory']
+        item.catagory = get_object_or_404(InvCatagory, id=catagory_id, user=request.user)
+        item.save()
+    return redirect('inventory')
+
+@login_required
+def delete_inventory(request, item_id):
+    item = get_object_or_404(Inventory, id=item_id, user=request.user)
+    item.delete()
+    return redirect('inventory')
+
+def reports(request):
+    # Get the current year
+    current_year = timezone.now().year
+
+    # Query BusinessDay model and aggregate the total sales by month
+    monthly_sales = BusinessDay.objects.filter(start_date__year=current_year) \
+        .annotate(month=ExtractMonth('start_date')) \
+        .values('month') \
+        .annotate(total_sales=Sum('total_sales')) \
+        .order_by('month')
+
+    # Prepare data for the chart
+    chart_data = {
+        'labels': [
+            "January", "February", "March", "April", "May", "June", 
+            "July", "August", "September", "October", "November", "December"
+        ],
+        'datasets': [{
+            'label': 'Income',
+            'backgroundColor': '#2d2c38',
+            'borderColor': '#19f5aa',
+            'borderWidth': 1,
+            'data': [0] * 12  # Initialize all months with 0
+        }]
+    }
+
+    # Populate the data from the database and convert to float
+    for entry in monthly_sales:
+        month = entry['month'] - 1  # month is 1-based, so subtract 1 for 0-based index
+        chart_data['datasets'][0]['data'][month] = float(entry['total_sales']) if entry['total_sales'] is not None else 0
+    return render(request, 'ESdashboard/reports.html',{'chart_data': chart_data})
+
+def reports_data(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        timeframe = data.get('timeframe')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+
+        # Process the selected timeframe
+        if timeframe == 'week':
+            # Get data for the selected week(s)
+            queryset = BusinessDay.objects.filter(start_date__gte=start_date, end_date__lte=end_date) \
+                                          .annotate(week=TruncWeek('start_date')) \
+                                          .values('week') \
+                                          .annotate(total_sales=Sum('total_sales')) \
+                                          .order_by('week')
+        elif timeframe == 'month':
+            # Get data for the selected month(s)
+            queryset = BusinessDay.objects.filter(start_date__gte=start_date, end_date__lte=end_date) \
+                                          .annotate(month=TruncMonth('start_date')) \
+                                          .values('month') \
+                                          .annotate(total_sales=Sum('total_sales')) \
+                                          .order_by('month')
+        elif timeframe == 'custom':
+            # Custom range of dates
+            queryset = BusinessDay.objects.filter(start_date__gte=start_date, end_date__lte=end_date) \
+                                          .annotate(month=TruncMonth('start_date')) \
+                                          .values('month') \
+                                          .annotate(total_sales=Sum('total_sales')) \
+                                          .order_by('month')
+
+        # Prepare data for the chart
+        labels = [str(item['week']) if timeframe == 'week' else item['month'].strftime('%B') for item in queryset]
+        revenue = [item['total_sales'] for item in queryset]
+
+        return JsonResponse({'labels': labels, 'revenue': revenue})
+
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+
+
+def print_receipt_view(request, bill_id):
+    # Get the bill and items for the specified bill_id
+    bill = get_object_or_404(Bill, id=bill_id)
+    items = BillItem.objects.filter(bill=bill)
+
+    # Configure serial port for Bluetooth printer
+    #ser = serial.Serial(port='COM9', baudrate=9600, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
+    #Printer Settings
+    ser = serial.Serial(
+        port='COM9',  # Update this to match the COM port shown in Device Manager
+        baudrate=9600,  # Check your printer’s manual in case this is different
+        bytesize=serial.EIGHTBITS,
+        parity=serial.PARITY_NONE,
+        stopbits=serial.STOPBITS_ONE,
+        timeout=1
+    )
+    try:
+        # Initialize printer
+        ser.write(b'\x1b\x40')  # ESC @ - initialize/reset printer
+
+        print_image('ESdashboard\\static\\ESdashboard\img\\reciept.png', ser)
+
+        # Print line separator
+        ser.write(b'-' * 32 + b'\n')
+
+        # Print each item in the bill
+        for item in items:
+            name = item.product_name[:16]  # Limit name to fit width
+            qty = str(item.quantity)
+            total = f'{item.linetot:.2f}'  # Format price as 2 decimal points
+            line = f"{name:<16} {qty:<4} {total:>8}\n"
+            ser.write(line.encode('utf-8'))
+
+        # Print total amount
+        ser.write(b'-' * 32 + b'\n')
+        ser.write(f'TOTAL          {bill.total_amount:.2f}\n'.encode('utf-8'))
+
+        # Print footer
+        ser.write(b'\n\n\n')  # Feed paper
+        ser.write(b'\x1b\x21\x01')  # ESC ! - select print mode
+        ser.write(b'\x1b\x21\x08')  # ESC ! - turn on bold
+        ser.write(b'Customer Receipt\n')
+        ser.write(b'\x1b\x21\x00')  # ESC ! - turn off bold
+        
+        ser.write(b'Thank you for your purchase!\n')
+
+        # Feed and cut the paper
+        ser.write(b'\n\n\n')  # Feed paper
+        ser.write(b'\x1d\x56\x42\x00')  # ESC i - cut paper
+
+        # Close the serial connection
+        ser.close()
+
+        # Return success response
+        return JsonResponse({'success': True})
+
+    except Exception as e:
+        # Close serial on error
+        ser.close()
+        print("Printing error:", e)
+        return JsonResponse({'success': False, 'error': str(e)})
+    
+def print_image(image_path, ser):
+    # Load and convert the image to black & white
+    img = Image.open(image_path).convert('1')  # '1' for 1-bit pixels (black and white)
+    
+    # Resize to printer width (adjust width as per your printer’s specs)
+    img = img.resize((384, int(384 * img.height / img.width)))
+    
+    # Start printing commands
+    ser.write(b'\x1b\x40')  # Initialize the printer
+    ser.write(b'\x1d\x76\x30\x00' + bytes([img.width // 8, 0, img.height % 256, img.height // 256]))
+    
+    # Print the image row by row
+    for y in range(img.height):
+        row_data = bytearray()
+        for x in range(0, img.width, 8):
+            byte = 0
+            for bit in range(8):
+                if x + bit < img.width and img.getpixel((x + bit, y)) == 0:
+                    byte |= 1 << (7 - bit)
+            row_data.append(byte)
+        ser.write(row_data)
+    
+    ser.write(b'\n')  # Move to the next line after image
+
 """
+
 [TO dO List]
 
 1.) ,.How to make the clientside app save and show the actualy state of the tables.
@@ -590,4 +801,7 @@ def get_chart_data(request):
 7.) Add admin page
 8.) For billing Active tables should either be catagorized alone or not displayed
     -force customer name
+
+9.) Name for bills
+10.) admin panel needs to have  the custom timeframes fixed on the reports page.    
 """

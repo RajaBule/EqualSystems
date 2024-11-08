@@ -71,3 +71,24 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+document.querySelector('.modal-footer .btn[data-bs-dismiss="modal"]').addEventListener('click', function() {
+    const billId = document.getElementById("payButton").dataset.billId;
+
+    fetch(`/print_receipt/${billId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),  // Ensure CSRF token is sent with the request
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Receipt printed successfully!');
+        } else {
+            alert('Failed to print the receipt.');
+        }
+    })
+    .catch(error => console.error('Error:', error));
+});

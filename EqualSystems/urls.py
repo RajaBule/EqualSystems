@@ -39,4 +39,11 @@ urlpatterns = [
     path('admin_panel/', views.adminp, name='adminp'),
     path('get-chart-data/', views.get_chart_data, name='get_chart_data'),
     #path('update_table_state/', views.update_table_state, name='update_table_state'),
+    path('inventory/', views.inventory, name='inventory'),
+    path('inventory/add/', views.add_inventory, name='add_inventory'),
+    path('inventory/edit/<int:item_id>/', views.edit_inventory, name='edit_inventory'),
+    path('inventory/delete/<int:item_id>/', views.delete_inventory, name='delete_inventory'),
+    path('reports/', views.reports, name='reports'),
+    path('reports/data/', views.reports_data, name='reports_data'),
+    path('print_receipt/<int:bill_id>/', views.print_receipt_view, name='print_receipt'),
 ]

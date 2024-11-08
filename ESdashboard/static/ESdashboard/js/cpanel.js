@@ -6,14 +6,17 @@ function handleButtonClick(button) {
     const tableName = button.getAttribute('name');
     const starturl = button.getAttribute('data-start-table-url');
     const setTime = button.getAttribute('data-settime');
+    const customerName = button.getAttribute('data-customer-name') || 'New Customer'; // Default if no customer name provided
 
     if (state == 1) {
+        // Code for handling the Stop modal
         const stopModal = new bootstrap.Modal(document.getElementById('modal-2'));
         const stopButton = document.querySelector('#modal-2 .stop-table-btn');
         stopButton.setAttribute('data-table-id', tableId);
         stopButton.setAttribute('data-relay-id', relayId);
         stopButton.setAttribute('data-url', url);
         stopButton.setAttribute('data-table-name', tableName);
+        document.getElementById("modal-2-label").innerText = `Stop ${tableName}`;
 
         // AJAX request to get the bill items for the selected table
         fetch(`/get-bill-items/${tableId}/`)
@@ -43,6 +46,10 @@ function handleButtonClick(button) {
 
         stopModal.show();
     } else {
+        // Set the table number and customer name in the modal title
+        document.getElementById('modal-table-number').textContent = tableId;
+        document.getElementById('modal-customer-name').textContent = customerName;
+
         const openModal = new bootstrap.Modal(document.getElementById('modal-3'));
         const openButton = document.querySelector('#modal-3 .open-table-btn');
         openButton.setAttribute('data-table-id', tableId);
@@ -56,6 +63,16 @@ function handleButtonClick(button) {
     }
 }
 
+
+document.getElementById('modal-3').addEventListener('hidden.bs.modal', function () {
+    // Clear all the input fields inside the modal
+    document.getElementById('customer-name').value = '';
+    document.getElementById('selected-rate-id').value = '';
+    document.getElementById('timeh').value = '';
+    document.getElementById('timem').value = '';
+});
+
+
 function handleTableStateChange3(button) {
     const tableId = button.getAttribute('data-table-id');
     const relayId = button.getAttribute('data-relay-id');
@@ -63,7 +80,8 @@ function handleTableStateChange3(button) {
     const starturl = button.getAttribute('data-start-table-url');
     const state = 1;
     const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-
+    const customerName = document.getElementById('customer-name').value;
+    console.log(customerName)
     // Get the selected rate ID
     const selectedRateId = document.getElementById('selected-rate-id').value;
     const startTime = new Date().toISOString();
@@ -85,6 +103,7 @@ function handleTableStateChange3(button) {
             'rate_id': selectedRateId,
             'start_time': startTime,
             'set_time': totalTimeMs,
+            'customer_name': customerName,
         },
         headers: {
             'X-CSRFToken': csrftoken
@@ -115,6 +134,7 @@ function handleTableStateChange3(button) {
                     data: {
                         'table_id': tableId,
                         'rate_id': selectedRateId,  // Send the selected rate to the start_table view as well
+                        'customer_name': customerName,
                     },
                     headers: {
                         'X-CSRFToken': csrftoken
@@ -151,6 +171,8 @@ function handleTableStateChange2(button) {
     const url = button.getAttribute('data-url');
     const tableName = button.getAttribute('data-table-name');
     const labelElement = document.getElementById(`timeleft-${tableId}`);
+    console.log(tableName)
+    document.getElementById("modal-2-label").innerText = tableName;
     console.log(labelElement)
     console.log(tableId, relayId)
     // Prepare the data to send via AJAX
@@ -415,7 +437,7 @@ function startCountdown(tableId, totalTimeMs, startTime) {
         clearInterval(countdownIntervalid[tableId]);
         labelElement.innerHTML = "Time's up!";
         const button = document.getElementById(tableId);
-        timeupStop(button)
+        timeupStop(button);
         return;
     }
     
@@ -445,61 +467,67 @@ function startCountdown(tableId, totalTimeMs, startTime) {
 //Set time times up function
 function timeupStop(button) {
     // Get data from the button
-    handleButtonClick(button);
-    //const tableId = button.id;
-    //const relayId = button.getAttribute('data-relay-id');
-    //const url = button.getAttribute('data-url');
-    //const tableName = button.getAttribute('name');
-    //
-    //console.log(tableId, relayId)
-    //// Prepare the data to send via AJAX
-    //const data = {
-    //    'table_id': tableId,
-    //    'relay_id': relayId,
-    //    'state': 0, // Stopping the table, state = 0
-    //    'csrfmiddlewaretoken': '{{ csrf_token }}' // Ensure CSRF token is included for Django
-    //};
-//
-    //// Send an AJAX POST request to update the state in the database
-    //$.ajax({
-    //    type: "POST",
-    //    url: url, // The URL to the Django view that handles the state update
-    //    data: data,
-    //    success: function(response) {
-    //        console.log('successful POST')
-    //        // Update the state in the HTML (front-end) upon successful response
-    //        const tableElement = document.getElementById(tableId);
-//
-    //        // Use the updated state from the response
-    //        const updatedState = response.updated_state;
-//
-    //        // Update the state attribute in the document
-    //        tableElement.setAttribute('data-state', updatedState); 
-    //        
-    //        // Change button content based on the updated state (0 = Open, 1 = In Use)
-    //        if (updatedState === 0) {
-    //            console.log('Table set to 0 state')
-    //        } else if (updatedState === 1) {
-    //            console.log('Table set to 1 state')
-    //        }
-//
-    //        document.getElementById(`${tableId}-time`).innerText = '-';
-    //        // Update the end_time and reset other relevant data as needed
-    //        document.getElementById(`timeleft-${tableId}`).innerText = '-';
-    //        // Close the modal
-    //        document.getElementById('hidden-close-button-stop').click();
-    //        clearInterval(intervalIds[tableId]);
-    //        clearInterval(countdownIntervalid[tableId]);
-    //        // Optionally, show a success message
-    //        alert('Table has been stopped successfully!');
-    //    },
-    //    error: function(xhr, status, error) {
-    //        // Handle errors if the request fails
-    //        console.log("Error stopping the table:", error);
-    //        alert('Failed to stop the table. Please try again.');
-    //    }
-    //});
+    console.log('STOP CALL FOR: ')
+    console.log(button)
+    const tableId = button.getAttribute('id');
+    const relayId = button.getAttribute('data-relay-id');
+    const url = button.getAttribute('data-url');
+    const tableName = button.getAttribute('name');
+    const labelElement = document.getElementById(`timeleft-${tableId}`);
+    console.log(tableName)
+    console.log(labelElement)
+    console.log(tableId, relayId)
+    // Prepare the data to send via AJAX
+    const data = {
+        'table_id': tableId,
+        'relay_id': relayId,
+        'state': 0, // Stopping the table, state = 0
+        'csrfmiddlewaretoken': '{{ csrf_token }}' // Ensure CSRF token is included for Django
+    };
+
+    // Send an AJAX POST request to update the state in the database
+    $.ajax({
+        type: "POST",
+        url: url, // The URL to the Django view that handles the state update
+        data: data,
+        success: function(response) {
+            console.log('successful POST')
+            // Update the state in the HTML (front-end) upon successful response
+            const tableElement = document.getElementById(tableId);
+
+            // Use the updated state from the response
+            const updatedState = response.updated_state;
+
+            // Update the state attribute in the document
+            tableElement.setAttribute('data-state', updatedState); 
+            
+            // Change button content based on the updated state (0 = Open, 1 = In Use)
+            if (updatedState === 0) {
+                console.log('Table set to 0 state')
+            } else if (updatedState === 1) {
+                console.log('Table set to 1 state')
+            }
+
+            document.getElementById(`${tableId}-time`).innerText = '-';
+            // Update the end_time and reset other relevant data as needed
+            document.getElementById(`timeleft-${tableId}`).innerText = '-';
+            // Close the modal
+            document.getElementById('hidden-close-button-stop').click();
+            labelElement.innerHTML = '-'
+            clearInterval(intervalIds[tableId]);
+            clearInterval(countdownIntervalid[tableId]);
+
+            // Optionally, show a success message
+            alert('Table has been stopped successfully!');
+        },
+        error: function(xhr, status, error) {
+            // Handle errors if the request fails
+            console.log("Error stopping the table:", error);
+            alert('Failed to stop the table. Please try again.');
+        }
+    });
 }
+
 
 function handlepButtonClick(button) {
     // Get table number from the button's ID (or name or data attribute)

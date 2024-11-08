@@ -1,86 +1,126 @@
-
 <!DOCTYPE html>
 <html data-bs-theme="light" lang="en">
-    {% extends 'ESdashboard/controlpbase.html' %}
-    {% load static %}
-    {% block content %}
-    
-    <div style="width: 85%; margin-left: 0px; display: inline-block;">
-        <h1 class="text-center text-warning" style="margin-top: 44px;">Unpaid Bills (Belum Lunas)</h1>
-        {% for bill_data in bills %}
-            {% if not bill_data.bill.is_paid %}
-            <div style="border-style: solid; border-color: var(--bs-yellow); margin-top: 10px;">
-                <label class="form-label text-warning">Meja {{ bill_data.bill.table.table_number }}</label>
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th class="text-light" style="border-bottom: solid var(--bs-yellow);">Item</th>
-                                <th class="text-light" style="border-bottom: solid var(--bs-yellow);">Quantity</th>
-                                <th class="text-light" style="border-bottom: solid var(--bs-yellow);">Line Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in bill_data.items %}
-                            <tr>
-                                <td class="text-light">{{ item.product_name }}</td>
-                                <td class="text-light">{{ item.quantity }}</td>
-                                <td class="text-light">{{ item.linetot }}</td>
-                            </tr>
-                            {% endfor %}
-                            <tr>
-                                <td class="fw-bold text-warning">TOTAL</td>
-                                <td></td>
-                                <td class="fw-bold text-warning">{{ bill_data.total_amount }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <button class="btn btn-primary process-payment-btn" style="background: var(--bs-yellow);" 
-                data-bill-id="{{ bill_data.bill.id }}" 
-                data-bs-toggle="modal" 
-                data-bs-target="#billingModal">Process Payment</button>
-            </div>
-            {% endif %}
-        {% endfor %}
-    </div>
+{% extends 'ESdashboard/controlpbase.html' %}
+{% load static %}
+{% block content %}
 
-    <div style="width: 85%; margin-left: 0px; display: inline-block;">
-        <h1 class="text-center text-success" style="margin-top: 44px;">Paid Bills (Sudah Lunas)</h1>
-        {% for bill_data in bills %}
-            {% if bill_data.bill.is_paid %}
-            <div style="border-style: solid; border-color: var(--bs-green); margin-top: 10px;">
-                <label class="form-label text-success">Meja {{ bill_data.bill.table.table_number }}</label>
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th class="text-light" style="border-bottom: solid var(--bs-green);">Item</th>
-                                <th class="text-light" style="border-bottom: solid var(--bs-green);">Quantity</th>
-                                <th class="text-light" style="border-bottom: solid var(--bs-green);">Line Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in bill_data.items %}
-                            <tr>
-                                <td class="text-light">{{ item.product_name }}</td>
-                                <td class="text-light">{{ item.quantity }}</td>
-                                <td class="text-light">{{ item.linetot }}</td>
-                            </tr>
-                            {% endfor %}
-                            <tr>
-                                <td class="fw-bold text-success">TOTAL</td>
-                                <td></td>
-                                <td class="fw-bold text-success">{{ bill_data.total_amount }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+<div style="width: 85%; margin-left: 0px; display: inline-block;">
+    <h1 class="text-center text-warning" style="margin-top: 44px;">Unpaid Bills - Closed Tables</h1>
+    {% for bill_data in bills %}
+        {% if not bill_data.bill.is_paid and bill_data.bill.end_time != NULL %}
+        <div style="border-style: solid; border-color: var(--bs-yellow); margin-top: 10px;">
+            <label class="form-label text-warning">Meja {{ bill_data.bill.table.table_number }} - {{ bill_data.bill.customer_name }}</label>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th class="text-light" style="border-bottom: solid var(--bs-yellow);">Item</th>
+                            <th class="text-light" style="border-bottom: solid var(--bs-yellow);">Quantity</th>
+                            <th class="text-light" style="border-bottom: solid var(--bs-yellow);">Line Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in bill_data.items %}
+                        <tr>
+                            <td class="text-light">{{ item.product_name }}</td>
+                            <td class="text-light">{{ item.quantity }}</td>
+                            <td class="text-light">{{ item.linetot }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr>
+                            <td class="fw-bold text-warning">TOTAL</td>
+                            <td></td>
+                            <td class="fw-bold text-warning">{{ bill_data.total_amount }}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
-            {% endif %}
-        {% endfor %}
-    </div>
-    <!-- Billing Modal -->
+            <button class="btn btn-primary process-payment-btn" style="background: var(--bs-yellow);" 
+            data-bill-id="{{ bill_data.bill.id }}" 
+            data-bs-toggle="modal" 
+            data-bs-target="#billingModal">Process Payment</button>
+        </div>
+        {% endif %}
+    {% endfor %}
+</div>
+
+<div style="width: 85%; margin-left: 0px; display: inline-block;">
+    <h1 class="text-center text-info" style="margin-top: 44px;">Unpaid Bills - Active Tables</h1>
+    {% for bill_data in bills %}
+        {% if not bill_data.bill.end_time and bill_data.bill.table.state == 1  %}
+        <div style="border-style: solid; border-color: var(--bs-blue); margin-top: 10px;">
+            <label class="form-label text-info">Meja {{ bill_data.bill.table.table_number }} - {{ bill_data.bill.customer_name }}</label>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th class="text-light" style="border-bottom: solid var(--bs-blue);">Item</th>
+                            <th class="text-light" style="border-bottom: solid var(--bs-blue);">Quantity</th>
+                            <th class="text-light" style="border-bottom: solid var(--bs-blue);">Line Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in bill_data.items %}
+                        <tr>
+                            <td class="text-light">{{ item.product_name }}</td>
+                            <td class="text-light">{{ item.quantity }}</td>
+                            <td class="text-light">{{ item.linetot }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr>
+                            <td class="fw-bold text-info">TOTAL</td>
+                            <td></td>
+                            <td class="fw-bold text-info">{{ bill_data.total_amount }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <button class="btn btn-primary process-payment-btn" style="background: var(--bs-blue);" 
+            data-bill-id="{{ bill_data.bill.id }}" 
+            data-bs-toggle="modal" 
+            data-bs-target="#billingModal">Process Payment</button>
+        </div>
+        {% endif %}
+    {% endfor %}
+</div>
+
+<div style="width: 85%; margin-left: 0px; display: inline-block;">
+    <h1 class="text-center text-success" style="margin-top: 44px;">Paid Bills (Sudah Lunas)</h1>
+    {% for bill_data in bills %}
+        {% if bill_data.bill.is_paid %}
+        <div style="border-style: solid; border-color: var(--bs-green); margin-top: 10px;">
+            <label class="form-label text-success">Meja {{ bill_data.bill.table.table_number }}</label>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th class="text-light" style="border-bottom: solid var(--bs-green);">Item</th>
+                            <th class="text-light" style="border-bottom: solid var(--bs-green);">Quantity</th>
+                            <th class="text-light" style="border-bottom: solid var(--bs-green);">Line Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in bill_data.items %}
+                        <tr>
+                            <td class="text-light">{{ item.product_name }}</td>
+                            <td class="text-light">{{ item.quantity }}</td>
+                            <td class="text-light">{{ item.linetot }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr>
+                            <td class="fw-bold text-success">TOTAL</td>
+                            <td></td>
+                            <td class="fw-bold text-success">{{ bill_data.total_amount }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    {% endfor %}
+</div>
+
+<!-- Billing Modal -->
 <div class="modal fade" id="billingModal" tabindex="-1" aria-labelledby="billingModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -118,7 +158,8 @@
         </div>
     </div>
 </div>
+
 <script src="{% static 'ESdashboard/js/billing.js' %}"></script>
-    {% endblock %}
+{% endblock %}
 </body>
 </html>

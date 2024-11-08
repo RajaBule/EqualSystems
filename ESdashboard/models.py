@@ -53,7 +53,8 @@ class InvCatagory(models.Model):
 class Inventory(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     product_name = models.CharField(max_length=255)
-    price = models.DecimalField(max_digits=20, decimal_places=2)
+    price = models.DecimalField(max_digits=20, decimal_places=0)
+    cost = models.DecimalField(max_digits=20, decimal_places=0)
     stock = models.PositiveIntegerField()
     catagory = models.ForeignKey(InvCatagory, on_delete=models.CASCADE, related_name='catagories')
 
