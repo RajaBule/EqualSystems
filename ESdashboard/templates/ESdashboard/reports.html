@@ -27,7 +27,8 @@
                     <li class="nav-item"><a class="nav-link" href="{% url 'inventory' %}">Inventory</a></li>
                     <li class="nav-item"></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'reports' %}">Reports</a></li>
-                </ul><a class="btn btn-primary link-dark shadow" role="button" href="signup.html" style="background: var(--bs-secondary);border-style: solid;border-color: var(--bs-secondary);">Admin Panel</a>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'settings' %}">Settings</a></li>
+                </ul><a class="btn btn-primary link-dark shadow" role="button" href="{% url 'cpanel' %}" style="background: var(--bs-secondary);border-style: solid;border-color: var(--bs-secondary);">Control Panel</a>
             </div>
         </div>
     </nav>

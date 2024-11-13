@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.http import (HttpResponse)
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseForbidden
 import requests
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate
@@ -20,12 +20,13 @@ from django.db.models import Sum, DateTimeField
 from django.db.models.functions import TruncMinute, ExtractMonth, TruncMonth, TruncWeek
 import serial
 from PIL import Image
+from functools import wraps
 
 timezonejkt = tz('Asia/Jakarta')
 counter_value = 0
 tbtotal = 0
 
-ESP32_URL = 'http://192.168.18.90/relay/'
+ESP32_URL = 'http://192.168.0.104/relay/'
 
 # TANEM - 192.168.18.90
 # HOME - ESP32_URL = 'http://192.168.0.104/relay/'
@@ -38,7 +39,13 @@ ESP32_URL = 'http://192.168.18.90/relay/'
 #const char* ssid = "De tower Bar";
 #const char* password = "tower1234";
 
-
+def local_admin_required(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_local_admin:
+            return HttpResponseForbidden("You are not authorized to access this page.")
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
 
 def sign_up(request):
     if request.method == 'POST':
@@ -113,6 +120,11 @@ def cpanel(request):
     business_day = BusinessDay.objects.filter(user=request.user, end_date__isnull=True).first()
     user_rates = Rate.objects.filter(user=request.user)
     categories = InvCatagory.objects.filter(user=user).prefetch_related('catagories')  # Prefetch related inventory items
+    
+
+    # Fetch all bills for the current business day
+    bills = Bill.objects.filter(user=request.user,business_day=business_day)
+
     for table in user_tables:
         if table.state == 1:
             
@@ -134,6 +146,7 @@ def cpanel(request):
         'started': day_start,
         'user_rates': user_rates,
         'categories': categories,
+        'bills': bills,
     }
 
     return render(request, 'ESdashboard/controlp.html', context)
@@ -202,7 +215,11 @@ def control_relay(request):
 
             # Update the state
             table.state = 0  # Stopped
-            table.ratePmin = Rate.objects.get(id=0)
+            if rate_id:
+                table.ratePmin = Rate.objects.get(id=rate_id)
+            else:    
+                table.ratePmin = Rate.objects.get(id=0)
+
             bill.duration = table.duration
             table.save()
 
@@ -222,6 +239,8 @@ def control_relay(request):
             table.duration = None
             table.start_time = None
             table.set_time = None
+            table.total_billing = 0
+            table.ratePmin = Rate.objects.get(id=0)
             table.save()
 
             try:
@@ -251,7 +270,6 @@ def control_relay(request):
         elif state == 1:
             try:
                 if rate_id:
-                    
                     rate = Rate.objects.get(id=rate_id)
                     table.ratePmin = rate
 
@@ -334,8 +352,9 @@ def start_table(request, table_id):
     # Create a new bill for this table
     new_bill = Bill.objects.create(user=table.user, table=table, business_day=business_day, customer_name=customer_name, total_amount=0.00)
     new_bill.start_time = table.start_time
-    
+    table.current_bill = new_bill.id
     new_bill.save()
+    table.save()
     return JsonResponse({'status': 'success'})
 
 def end_of_day_sales_summary(request):
@@ -392,7 +411,7 @@ def add_purchase(request):
             # Check if there is an open bill for the table
             bill = Bill.objects.filter(table=table, is_paid=False, end_time=None).first()
             
-            # If no open bill, create a new one
+            # If no open bill
             if not bill:
                 return JsonResponse({'status': 'error', 'message': 'No Bill'}, status=400)
             
@@ -411,7 +430,8 @@ def add_purchase(request):
             # Update the total amount of the bill
             
             bill.save()
-            
+            table.total_billing = bill.total_amount
+            table.save()
             return JsonResponse({'status': 'success', 'bill_item_id': bill_item.id})
         except Table.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Table not found'}, status=404)
@@ -482,6 +502,7 @@ def pay_bill(request, bill_id):
         
 from django.utils.dateformat import format
 
+@local_admin_required
 @login_required
 def adminp(request):
     user = request.user
@@ -533,6 +554,7 @@ def adminp(request):
 
     return render(request, 'ESdashboard/today.html', context)
 
+@local_admin_required
 @login_required
 def get_chart_data(request):
     user = request.user
@@ -585,6 +607,7 @@ def get_chart_data(request):
         'data': bills_data,
     })
 
+@local_admin_required
 @login_required
 def inventory(request):
     # Fetch the inventory items for the logged-in user
@@ -592,6 +615,7 @@ def inventory(request):
     context = {'inventory_items': inventory_items}
     return render(request, 'ESdashboard/inventory.html', context)
 
+@local_admin_required
 @login_required
 def add_inventory(request):
     if request.method == "POST":
@@ -604,6 +628,7 @@ def add_inventory(request):
         Inventory.objects.create(user=request.user, product_name=product_name, stock=stock, cost=cost, price=price, catagory=catagory)
     return redirect('inventory')
 
+@local_admin_required
 @login_required
 def edit_inventory(request, item_id):
     item = get_object_or_404(Inventory, id=item_id, user=request.user)
@@ -617,12 +642,14 @@ def edit_inventory(request, item_id):
         item.save()
     return redirect('inventory')
 
+@local_admin_required
 @login_required
 def delete_inventory(request, item_id):
     item = get_object_or_404(Inventory, id=item_id, user=request.user)
     item.delete()
     return redirect('inventory')
 
+@local_admin_required
 def reports(request):
     # Get the current year
     current_year = timezone.now().year
@@ -655,6 +682,7 @@ def reports(request):
         chart_data['datasets'][0]['data'][month] = float(entry['total_sales']) if entry['total_sales'] is not None else 0
     return render(request, 'ESdashboard/reports.html',{'chart_data': chart_data})
 
+@local_admin_required
 def reports_data(request):
     if request.method == "POST":
         data = json.loads(request.body)
@@ -782,6 +810,40 @@ def print_image(image_path, ser):
     
     ser.write(b'\n')  # Move to the next line after image
 
+@local_admin_required
+@login_required
+def settings(request):
+    # Fetch the inventory items for the logged-in user
+    rates = Rate.objects.filter(user=request.user)
+    context = {'rates': rates}
+    return render(request, "ESdashboard\settings.html", context)
+
+@local_admin_required
+@login_required
+def add_rate(request):
+    if request.method == "POST":
+        rate_name = request.POST['rate_name']
+        price = request.POST['per_minute_rate']
+        Rate.objects.create(user=request.user, name=rate_name, per_minute_rate=price)
+    return redirect('settings')
+
+@local_admin_required
+@login_required
+def edit_rate(request, rate_id):
+    rate = get_object_or_404(Rate, id=rate_id, user=request.user)
+    if request.method == "POST":
+        rate.name = request.POST['rate_name']
+        rate.per_minute_rate = request.POST['per_minute_rate']
+        rate.save()
+    return redirect('settings')
+
+@local_admin_required
+@login_required
+def delete_rate(request, rate_id):
+    rate = get_object_or_404(Rate, id=rate_id, user=request.user)
+    rate.delete()
+    return redirect('settings')
+
 """
 
 [TO dO List]
@@ -795,13 +857,33 @@ def print_image(image_path, ser):
     .) live billing lable
     .) reciept.
     .) Proccess payment button
+    .) TIme set to hours instead of minutes. (also round up).
 5.) times up close ssystem
 5.) Reports
+    .) per table anlysis. Zoom in. Zoom out (more detail)
+    .)calaander view
+    .) per server review
+    .) Out side of tables. Sales reports
 6.) make sure all tables are set to off when starting 
 7.) Add admin page
 8.) For billing Active tables should either be catagorized alone or not displayed
     -force customer name
 
+
+
 9.) Name for bills
 10.) admin panel needs to have  the custom timeframes fixed on the reports page.    
+11.) Inventory needs to include ingredients
+12.) Billing d luar meja
+
+versi kabel
+
+
+[TRIAL]
+
+1.) Billing live
+2.) Profile settings perjam (charge)
+    minimal payment (rounding)
+3.) Print on Stop.
+    Reciept needs a change function and input to put in cash recieved.
 """

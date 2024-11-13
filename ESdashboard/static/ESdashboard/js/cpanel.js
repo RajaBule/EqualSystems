@@ -7,7 +7,12 @@ function handleButtonClick(button) {
     const starturl = button.getAttribute('data-start-table-url');
     const setTime = button.getAttribute('data-settime');
     const customerName = button.getAttribute('data-customer-name') || 'New Customer'; // Default if no customer name provided
-
+    const rate_id = button.getAttribute('data-selected-rate-id');
+    const ratePmin = button.getAttribute('data-selected-ratepMin');
+    const billTotal = button.getAttribute('data-bill-total');
+    const billId = button.getAttribute('data-bill-id');
+    
+    console.log('ButtonHanle set rate to: ', rate_id, ratePmin)
     if (state == 1) {
         // Code for handling the Stop modal
         const stopModal = new bootstrap.Modal(document.getElementById('modal-2'));
@@ -16,6 +21,9 @@ function handleButtonClick(button) {
         stopButton.setAttribute('data-relay-id', relayId);
         stopButton.setAttribute('data-url', url);
         stopButton.setAttribute('data-table-name', tableName);
+        stopButton.setAttribute('data-selected-rate-id', rate_id);
+        stopButton.setAttribute('data-bill-id', billId);
+        
         document.getElementById("modal-2-label").innerText = `Stop ${tableName}`;
 
         // AJAX request to get the bill items for the selected table
@@ -58,6 +66,9 @@ function handleButtonClick(button) {
         openButton.setAttribute('data-table-name', tableName);
         openButton.setAttribute('data-start-table-url', starturl);
         openButton.setAttribute('data-settime', setTime);
+        openButton.setAttribute('data-selected-rate-id', rate_id);
+        openButton.setAttribute('data-selected-rate-value', ratePmin);
+        openButton.setAttribute('data-bill-total', billTotal);
 
         openModal.show();
     }
@@ -81,30 +92,36 @@ function handleTableStateChange3(button) {
     const state = 1;
     const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
     const customerName = document.getElementById('customer-name').value;
+    const ratePmin = button.getAttribute('data-selected-rate-value');
+    const billTotal = button.getAttribute('data-bill-total');
     console.log(customerName)
     // Get the selected rate ID
     const selectedRateId = document.getElementById('selected-rate-id').value;
     const startTime = new Date().toISOString();
-
+    console.log('Moal select rate: ', selectedRateId, ratePmin)
     // Get user input for duration (hours and minutes)
     const hours = parseInt(document.getElementById('timeh').value) || 0;
     const minutes = parseInt(document.getElementById('timem').value) || 0;
 
     const totalTimeMs = (hours * 60 * 60 * 1000) + (minutes * 60 * 1000);
 
+    const data = {
+        'table_id': tableId,
+        'relay_id': relayId,
+        'state': state,
+        'rate_id': selectedRateId,
+        'start_time': startTime,
+        'set_time': totalTimeMs,
+        'customer_name': customerName,
+    };
+
+    console.log('Logging Open data', data)
+
     // Send the AJAX request to update the table's state and rate
     $.ajax({
         type: "POST",
         url: url,
-        data: {
-            'table_id': tableId,
-            'relay_id': relayId,
-            'state': state,
-            'rate_id': selectedRateId,
-            'start_time': startTime,
-            'set_time': totalTimeMs,
-            'customer_name': customerName,
-        },
+        data: data,
         headers: {
             'X-CSRFToken': csrftoken
         },
@@ -112,12 +129,15 @@ function handleTableStateChange3(button) {
             console.log('successful POST');
             const tableElement = document.getElementById(tableId);
             const updatedState = response.updated_state;
-
+            
             tableElement.setAttribute('data-state', updatedState);
-
+            tableElement.setAttribute('data-selected-rate-id', selectedRateId);
+            tableElement.setAttribute('data-selected-ratePmin', ratePmin);
+            const tablediv = document.getElementById(`div-${tableId}`)
             if (updatedState === 1) {
                 console.log('Table set to in-use state');
-
+                // Update the table's appearance
+                tablediv.style = "height: 100%;width: 19.5%;margin-left: 5px;border: 5.4px solid var(--bs-form-valid-border-color);"
                 // Check if the user set a timer
                 if (hours > 0 || minutes > 0) {
                     console.log(`Starting countdown: ${hours} hours, ${minutes} minutes`);
@@ -153,7 +173,8 @@ function handleTableStateChange3(button) {
 
             // Optionally, show a success message
             alert('Table has been opened successfully!');
-            updateTableDuration(tableId, startTime);
+            updateTableDuration(tableId, startTime, state, ratePmin, billTotal);
+            console.log("RatePMin after success: ", ratePmin)
         },
         error: function(xhr, status, error) {
             console.error("Error while opening the table:", error, status, xhr);
@@ -166,13 +187,17 @@ function handleTableStateChange3(button) {
 function handleTableStateChange2(button) {
     console.log("Button clicked:", button); // This should log the button element
     // Get data from the button
+    
     const tableId = button.getAttribute('data-table-id');
     const relayId = button.getAttribute('data-relay-id');
     const url = button.getAttribute('data-url');
     const tableName = button.getAttribute('data-table-name');
+    const selectedRateId = button.getAttribute('data-selected-rate-id');
     const labelElement = document.getElementById(`timeleft-${tableId}`);
+    const billId = button.getAttribute('data-bill-id');
     console.log(tableName)
     document.getElementById("modal-2-label").innerText = tableName;
+    const billingLabel = document.getElementById(`live-billing-${tableId}`);
     console.log(labelElement)
     console.log(tableId, relayId)
     // Prepare the data to send via AJAX
@@ -180,9 +205,13 @@ function handleTableStateChange2(button) {
         'table_id': tableId,
         'relay_id': relayId,
         'state': 0, // Stopping the table, state = 0
+        'rate_id': selectedRateId,
         'csrfmiddlewaretoken': '{{ csrf_token }}' // Ensure CSRF token is included for Django
     };
 
+    const tablediv = document.getElementById(`div-${tableId}`)
+    
+    console.log(data)    
     // Send an AJAX POST request to update the state in the database
     $.ajax({
         type: "POST",
@@ -198,7 +227,8 @@ function handleTableStateChange2(button) {
 
             // Update the state attribute in the document
             tableElement.setAttribute('data-state', updatedState); 
-            
+            tablediv.style = "height: 100%;width: 19.5%;border: 5.4px solid var(--bs-secondary-text-emphasis);margin-left: 5px;"
+            billingLabel.innerHTML = "Billing: 0";
             // Change button content based on the updated state (0 = Open, 1 = In Use)
             if (updatedState === 0) {
                 console.log('Table set to 0 state')
@@ -224,6 +254,23 @@ function handleTableStateChange2(button) {
             alert('Failed to stop the table. Please try again.');
         }
     });
+
+    fetch(`/print_receipt/${billId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),  // Ensure CSRF token is sent with the request
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Receipt printed successfully!');
+        } else {
+            alert('Failed to print the receipt.');
+        }
+    })
+    .catch(error => console.error('Error:', error));
 }
 
 document.getElementById('startall').addEventListener('click', function() {
@@ -358,54 +405,71 @@ function selectRate(rateId, rateName) {
 // Store interval IDs so they can be cleared later
 const intervalIds = {};
 
-function updateTableDuration(tableId, startTime, tableState) {
-    const labelElement = document.getElementById(`${tableId}-time`);
-    console.log('starting timer for table: ' , tableId)
-    console.log(startTime)
+function updateTableDuration(tableId, startTime, tableState, ratePerMinute, billTotal) {
+    const durationLabel = document.getElementById(`${tableId}-time`);
+    const billingLabel = document.getElementById(`live-billing-${tableId}`);
+    
+    console.log('Starting timer for table: ', tableId);
+    console.log('Start time:', startTime);
+    console.log('Rate Per minute on Table uration: ', ratePerMinute)
+    console.log('Bill Total in upateuration: ', billTotal)
     // Clear any existing interval for this table
     if (intervalIds[tableId]) {
         clearInterval(intervalIds[tableId]);
     }
 
-    // If the table state is 0, reset the timer and return
+    // If the table state is 0, reset the timer and billing label, then return
     if (tableState === 0) {
-        labelElement.innerHTML = "-";
+        durationLabel.innerHTML = "-";
+        billingLabel.innerHTML = "Billing: 0";
         return;
     }
 
     // Convert startTime to a Date object
     const startDate = new Date(startTime);
     if (isNaN(startDate.getTime())) {
-        labelElement.innerHTML = "-";
+        durationLabel.innerHTML = "-";
+        billingLabel.innerHTML = "Billing: 0";
         return;
     }
-    console.log(startDate)
 
-    // Create a new interval to update the time every second
+    // Create a new interval to update the time and billing every second
     intervalIds[tableId] = setInterval(() => {
         const now = new Date();
-        const elapsedTime = new Date(now - startDate);
+        const elapsedTimeMs = new Date(now - startDate);
 
-        const seconds = Math.floor((elapsedTime % (1000 * 60)) / 1000);
-        const minutes = Math.floor((elapsedTime % (1000 * 60 * 60)) / (1000 * 60));
-        const hours = Math.floor(elapsedTime / (1000 * 60 * 60));
+        const seconds = Math.floor((elapsedTimeMs % (1000 * 60)) / 1000);
+        const minutes = Math.floor((elapsedTimeMs % (1000 * 60 * 60)) / (1000 * 60));
+        const hours = Math.floor(elapsedTimeMs / (1000 * 60 * 60));
 
-        // Update the label
-        labelElement.innerHTML = `${hours}h ${minutes}m ${seconds}s`;
+        // Update the duration label
+        durationLabel.innerHTML = `${hours}h ${minutes}m ${seconds}s`;
+
+        // Calculate current billing based on elapsed time and rate per minute
+        const elapsedMinutes = Math.floor(elapsedTimeMs / 60000);
+        const currentBilling = (elapsedMinutes * ratePerMinute).toFixed(2);
+        const finalBilling = Number(currentBilling) + Number(billTotal);
+
+        console.log("Elapse time: ",elapsedMinutes, " \n ratePerMinute: ",ratePerMinute)
+        // Update the billing label
+        billingLabel.innerHTML = `Billing: ${finalBilling}`;
 
         // Optionally, check if table state changes during the interval
-        // If table state becomes 0, stop and reset the timer
+        // If table state becomes 0, stop and reset the timer and billing label
         if (tableState === 0) {
             clearInterval(intervalIds[tableId]);
-            labelElement.innerHTML = "-";
+            durationLabel.innerHTML = "-";
+            billingLabel.innerHTML = "Billing: 0";
         }
     }, 1000);
 }
 
 
+
 const countdownIntervalid = {};
 // Countdown timer function
 function startCountdown(tableId, totalTimeMs, startTime) {
+    console.log("start count call...")
     const labelElement = document.getElementById(`timeleft-${tableId}`);
     
     // Parse startTime to a Date object
@@ -587,3 +651,4 @@ document.querySelectorAll('#modal-1 .dropdown-item').forEach(item => {
         purchaseButton.setAttribute('data-item', selectedItem);
     });
 });
+

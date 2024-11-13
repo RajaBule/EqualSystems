@@ -41,7 +41,18 @@
             <div class="row text-center" style="margin-right: 0px;margin-top: 4px;">
                 {% for table in tables %}
                     
-                <div class="col-md-3 text-center text-bg-dark" style="height: 100%;width: 19.5%;margin-left: 5px;border: 5.4px solid var(--bs-form-valid-border-color) ;">
+                <div id="div-{{ table.table_number }}" 
+                        class="col-md-3 text-center text-bg-dark"
+                        style="
+                            height: 100%;
+                            width: 19.5%;
+                            margin-left: 5px;
+                            {% if table.state == 1 %}
+                                border: 5.4px solid var(--bs-form-valid-border-color);
+                            {% else %}
+                                border: 5.4px solid var(--bs-secondary-text-emphasis);
+                            {% endif %}
+                        ">
                     <div class="row text-center" style="width: 100%;text-align: center;">
                         <div class="col text-center" style="width: 100%;height: 33%;padding-right: 0px;padding-left: 0px;text-align: center;margin-left: 24px;">
                             <div class="text-center" style="width: 100%;">
@@ -59,8 +70,12 @@
                             data-url="{% url 'control_relay' %}"
                             class="btn btn-primary btn-sm text-center d-block icon-button w-100" 
                             type="button"
+                            data-bill-total="{{ table.total_billing }}"
+                            data-selected-rate-id="{{ table.ratePmin_id }}"
+                            data-selected-ratepMin="{{ table.ratePmin.per_minute_rate }}"
                             data-settime="{{ table.set_time }}"
                             data-start-table-url="{% url 'start_table' table.id %}"
+                            data-bill-id="{{ table.current_bill }}"
                             name="meja {{ table.table_number }}" 
                             style="background: var(--bs-secondary);margin: auto;margin-top: 5px;border-color: var(--bs-secondary);width: 100%;"
                             onclick="handleButtonClick(this)">
@@ -82,23 +97,17 @@
                     </div>
                     <div class="row">
                         <div class="col text-center">
-                            <label class="col-form-label">Billing: {{ table.total_billing }}</label>
+                            <label id="live-billing-{{ table.table_number }}" class="col-form-label">Billing: {{ table.total_billing }}</label>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col text-center">
                             <label class="form-label" id="duration-{{ table.table_number }}" style="margin-bottom: 0px;">Durasi:&nbsp;</label>
-                            <div>
-                                <label id="{{table.table_number}}-time" class="form-label" style="margin-bottom: 0px;">{{ table.get_duration }}</label>
-                             
-                            </div>
+                            <label id="{{table.table_number}}-time" class="form-label" style="margin-bottom: 0px;">{{ table.get_duration }}</label>
                         </div>
                         <div class="col text-center">
                             <label class="form-label" id="time-left-{{ table.table_number }}" style="margin-bottom: 0px;">Sisa:&nbsp;</label>
-                            <div>
-                                
-                                <label id="timeleft-{{table.table_number}}" class="form-label" style="margin-bottom: 0px;">{{ table.set_time }}</label>
-                            </div>
+                            <label id="timeleft-{{table.table_number}}" class="form-label" style="margin-bottom: 0px;">{{ table.set_time }}</label>
                         </div>
                     </div>
                 </div>
@@ -113,13 +122,17 @@
                         const tableState = "{{ table.state }}";  // Pass the table state
                         const tableid = "{{ table.table_number }}";
                         const settime = "{{ table.set_time }}";
-                        console.log(startTime)
-                        console.log(tableState)
-                        console.log(tableState)
-                        console.log('Set Time: ', settime)
-                        totalTimeMs = convertHMSToMilliseconds(settime)
+                        const ratePerMinute = "{{ table.ratePmin.per_minute_rate }}";
+                        const billTotal = "{{ table.total_billing }}";
+                        
+                        console.log(startTime);
+                        console.log(tableState);
+                        console.log(tableState);
+                        console.log('Set Time: ', settime);
+                        console.log("Rate from event Listener: ", ratePerMinute);
+                        totalTimeMs = convertHMSToMilliseconds(settime);
                         startCountdown(tableid, totalTimeMs, startTime);
-                        updateTableDuration(tableid, startTime, tableState);
+                        updateTableDuration(tableid, startTime, tableState, ratePerMinute, billTotal);
                     });
                 </script>
                 {% endfor %}
@@ -198,6 +211,9 @@
                         data-start-table-url=""
                         data-settime=""
                         data-customer-name=""
+                        data-selected-rate-id=""
+                        data-selected-rate-value=""
+                        data-bill-total=""
                         data-url="{% url 'control_relay' %}"
                         onclick="handleTableStateChange3(this)">Open</button>
                     <button id="hidden-close-button" type="button" class="d-none" data-bs-dismiss="modal"></button>
@@ -253,6 +269,8 @@
                     data-table-id="" 
                     data-relay-id=""
                     data-url="{% url 'control_relay' %}"
+                    data-selected-rate-id=""
+                    data-bill-id=""
                     onclick="handleTableStateChange2(this)">STOP</button>
                     <button id="hidden-close-button-stop" type="button" class="d-none" data-bs-dismiss="modal"></button>
                 </div>

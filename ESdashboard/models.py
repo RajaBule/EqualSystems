@@ -9,6 +9,7 @@ class CustomUser(AbstractUser):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
+    is_local_admin = models.BooleanField(default=False)
     def __str__(self):
         return self.username
     
@@ -31,6 +32,7 @@ class Table(models.Model):
     set_time = models.DurationField(null=True)
     state = models.IntegerField(default=0)
     total_billing = models.DecimalField(max_digits=20, decimal_places=2)
+    current_bill =  models.PositiveIntegerField(null=True, blank=True)
 
     def get_duration(self):
         if self.state == 1:
