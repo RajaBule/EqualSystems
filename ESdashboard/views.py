@@ -26,7 +26,7 @@ timezonejkt = tz('Asia/Jakarta')
 counter_value = 0
 tbtotal = 0
 
-ESP32_URL = 'http://192.168.0.104/relay/'
+ESP32_URL = 'http://192.168.18.90/relay/'
 
 # TANEM - 192.168.18.90
 # HOME - ESP32_URL = 'http://192.168.0.104/relay/'

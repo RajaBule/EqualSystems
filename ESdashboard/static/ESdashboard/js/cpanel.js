@@ -635,6 +635,7 @@ function handlePurchase(purchaseButton) {
     .then(response => response.json())
     .then(data => {
         console.log('Success:', data);
+        location.reload();
         // Close the modal after successful submission
         const modal = bootstrap.Modal.getInstance(document.getElementById('modal-1'));
         modal.hide();
