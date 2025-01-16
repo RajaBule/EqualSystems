@@ -21,12 +21,16 @@ from django.db.models.functions import TruncMinute, ExtractMonth, TruncMonth, Tr
 import serial
 from PIL import Image
 from functools import wraps
+import math
+from django.utils.dateformat import format
 
 timezonejkt = tz('Asia/Jakarta')
 counter_value = 0
 tbtotal = 0
+#used to skip printing reciepts for testing purposes
+testingReciept = True
 
-ESP32_URL = 'http://192.168.18.90/relay/'
+ESP32_URL = 'http://192.168.1.161/relay/'
 
 # TANEM - 192.168.18.90
 # HOME - ESP32_URL = 'http://192.168.0.104/relay/'
@@ -38,6 +42,17 @@ ESP32_URL = 'http://192.168.18.90/relay/'
 # - EQUAL gateway: 192.168.1.1
 #const char* ssid = "De tower Bar";
 #const char* password = "tower1234";
+
+#const char* ssid = "Equal pool";
+#const char* password = "tower123";
+#fc:e8:c0:7b:3c:b8
+
+""" Set your Static IP address
+IPAddress local_IP(192, 168, 1, 161);
+// Set your Gateway IP address
+IPAddress gateway(192, 168, 1, 1);
+IPAddress subnet(255, 255, 255, 0);
+"""
 
 def local_admin_required(view_func):
     @wraps(view_func)
@@ -125,6 +140,7 @@ def cpanel(request):
     # Fetch all bills for the current business day
     bills = Bill.objects.filter(user=request.user,business_day=business_day)
 
+    
     for table in user_tables:
         if table.state == 1:
             
@@ -132,9 +148,10 @@ def cpanel(request):
             time_in_milliseconds = time_diff.total_seconds() * 1000
             table.duration = timedelta(milliseconds=time_in_milliseconds)
             print(f"Table {table.table_number} duration: {table.duration}")
-
+    
         # Save the updated table duration
         table.save()
+ 
     if not business_day:
         # Set day check value to ture/false
         day_start = 'False'
@@ -156,7 +173,7 @@ def billing(request):
     bday = BusinessDay.objects.filter(user=request.user, end_date__isnull=True).first()
 
     # Fetch all bills for the current business day
-    bills = Bill.objects.filter(business_day=bday)
+    bills = Bill.objects.filter(user=request.user, business_day=bday)
 
     # For each bill, we will also gather the associated BillItems
     bill_data = []
@@ -193,15 +210,15 @@ def control_relay(request):
         print('Run Time: ', timezone.now())
         print('Set time: ', set_time)
         
-        table = Table.objects.get(table_number=table_id)
+        table = Table.objects.get(user=request.user, table_number=table_id)
         esp32_payload = {
                 'relay_id': relay_id,
                 'state': state
             }
 
-        if state == 0:  # Stopping the table
+        if state == 0 and testingReciept != True:  # Stopping the table
             timeNow = timezone.now()
-            bill = Bill.objects.get(start_time=table.start_time)
+            bill = Bill.objects.get(user=request.user, start_time=table.start_time)
             bill.end_time = timeNow
             
             # Update the end_time
@@ -216,14 +233,14 @@ def control_relay(request):
             # Update the state
             table.state = 0  # Stopped
             if rate_id:
-                table.ratePmin = Rate.objects.get(id=rate_id)
+                table.ratePmin = Rate.objects.get(user=request.user, id=rate_id)
             else:    
                 table.ratePmin = Rate.objects.get(id=0)
 
             bill.duration = table.duration
             table.save()
 
-            duration_minutes = int(table.duration.total_seconds() / 60)  # Convert to minutes
+            duration_minutes = math.ceil(table.duration.total_seconds() / 60)  # Convert to minutes
             
             #create bill item for customer's bill to charge for table use
             BillItem.objects.create(
@@ -240,6 +257,8 @@ def control_relay(request):
             table.start_time = None
             table.set_time = None
             table.total_billing = 0
+            table.end_time = None
+            table.current_bill = None
             table.ratePmin = Rate.objects.get(id=0)
             table.save()
 
@@ -267,7 +286,7 @@ def control_relay(request):
                     'message': f'Failed to communicate with ESP32: {str(e)}'
                 }, status=500)
             
-        elif state == 1:
+        elif state == 1 and testingReciept != True:
             try:
                 if rate_id:
                     rate = Rate.objects.get(id=rate_id)
@@ -311,11 +330,93 @@ def control_relay(request):
             except Table.DoesNotExist:
                 return JsonResponse({'status': 'error', 'message': 'Table not found'}, status=404)
 
+
+#FOR TESTING ONLY WITHOUT ESP32 CONNECTION!
+        if state == 0 and testingReciept:  # Stopping the table
+            timeNow = timezone.now()
+            bill = Bill.objects.get(user=request.user, start_time=table.start_time)
+            bill.end_time = timeNow
+            
+            # Update the end_time
+            table.end_time = timeNow
+            # Calculate the duration based on the start_time and end_time
+            if table.start_time:
+                table.duration = table.end_time - table.start_time
+                
+            else:
+                table.duration = 0
+
+            # Update the state
+            table.state = 0  # Stopped
+            if rate_id:
+                table.ratePmin = Rate.objects.get(id=rate_id)
+            else:    
+                table.ratePmin = Rate.objects.get(id=0)
+
+            bill.duration = table.duration
+            table.save()
+
+            duration_minutes = math.ceil(table.duration.total_seconds() / 60)  # Convert to minutes
+            
+            #create bill item for customer's bill to charge for table use
+            bill_item = BillItem.objects.create(
+                user=table.user,
+                bill=bill,
+                product_name='Table',
+                quantity=duration_minutes,
+                price=table.ratePmin.per_minute_rate,
+                )
+            bill_item.linetot = bill_item.linetot + 1000
+          
+            bill.save()
+            table.duration = None
+            table.start_time = None
+            table.set_time = None
+            table.total_billing = 0
+            table.end_time = None
+            table.current_bill = None
+            table.ratePmin = Rate.objects.get(id=0)
+            table.save()
+
+            return JsonResponse({
+                    'status': 'success',
+                    'message': 'Table state updated successfully',
+                    'updated_state': table.state,
+               
+                })
+            
+        elif state == 1 and testingReciept:
+            try:
+                if rate_id:
+                    rate = Rate.objects.get(id=rate_id)
+                    table.ratePmin = rate
+
+                if set_time:
+                    table.set_time = set_time
+                    
+            # Update the table state in the database
+                table.state = state
+                table.start_time = timezone.now()
+                table.save()
+                print('data base updated')
+
+            # Send' relay_id and state to ESP32
+            
+                return JsonResponse({
+                    'status': 'success',
+                    'message': 'Table state updated successfully',
+                    'updated_state': table.state,
+                    })
+
+            except Table.DoesNotExist:
+                return JsonResponse({'status': 'error', 'message': 'Table not found'}, status=404)
+
     return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
 
 @csrf_exempt
 def set_all_relays_off(request):
-    if request.method == 'POST':
+    if request.method == 'POST' and testingReciept != True:
+        
         alloffurl = str(ESP32_URL) + 'all/off/'
         try:
             response = requests.post(alloffurl)
@@ -328,14 +429,16 @@ def set_all_relays_off(request):
         except requests.exceptions.RequestException as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
-        
+    elif testingReciept == True:
+        print('debug ON: set_all_relays_off!')
+        return JsonResponse({'status': 'success', 'message': 'All relays turned off'})
 
     return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=400)
 
 def start_table(request, table_id):
-    print(table_id)
+    print("START_TABLE FOR: ", table_id)
     table = Table.objects.get(id=table_id)
-        
+    print("Table get: ", table)
     if request.POST.get('customer_name'):
         customer_name = request.POST.get('customer_name')
     else:
@@ -406,7 +509,7 @@ def add_purchase(request):
 
         try:
             # Get the table
-            table = Table.objects.get(table_number=table_id)
+            table = Table.objects.get(user=request.user, table_number=table_id)
             
             # Check if there is an open bill for the table
             bill = Bill.objects.filter(table=table, is_paid=False, end_time=None).first()
@@ -444,9 +547,9 @@ def add_purchase(request):
 def get_bill_items(request, table_id):
     # Assuming that table_id corresponds to the Bill and BillItems
     try:
-        table = Table.objects.get(table_number=table_id)
+        table = Table.objects.get(user=request.user, table_number=table_id)
         # Get the current bill for the table
-        bill = Bill.objects.get(table__id=table.id, end_time=None)  # Adjust status if needed
+        bill = Bill.objects.get(user=request.user, table__id=table.id, end_time=None)  # Adjust status if needed
 
         # Get all bill items for this bill
         bill_items = BillItem.objects.filter(bill=bill)
@@ -494,13 +597,17 @@ def pay_bill(request, bill_id):
     if request.method == "POST":
         try:
             bill = Bill.objects.get(id=bill_id)
+            data = json.loads(request.body)
+            discount_percent = data.get("discount", 0)  # Get discount from request
+            bill.percentdiscount = discount_percent  # Save discount to the bill
             bill.is_paid = True
             bill.save()
             return JsonResponse({'status': 'success'})
         except Bill.DoesNotExist:
             return JsonResponse({'status': 'error', 'message': 'Bill not found'}, status=404)
+    return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
         
-from django.utils.dateformat import format
+
 
 @local_admin_required
 @login_required
@@ -655,7 +762,7 @@ def reports(request):
     current_year = timezone.now().year
 
     # Query BusinessDay model and aggregate the total sales by month
-    monthly_sales = BusinessDay.objects.filter(start_date__year=current_year) \
+    monthly_sales = BusinessDay.objects.filter(user=request.user, start_date__year=current_year) \
         .annotate(month=ExtractMonth('start_date')) \
         .values('month') \
         .annotate(total_sales=Sum('total_sales')) \
@@ -693,21 +800,21 @@ def reports_data(request):
         # Process the selected timeframe
         if timeframe == 'week':
             # Get data for the selected week(s)
-            queryset = BusinessDay.objects.filter(start_date__gte=start_date, end_date__lte=end_date) \
+            queryset = BusinessDay.objects.filter(user=request.user, start_date__gte=start_date, end_date__lte=end_date) \
                                           .annotate(week=TruncWeek('start_date')) \
                                           .values('week') \
                                           .annotate(total_sales=Sum('total_sales')) \
                                           .order_by('week')
         elif timeframe == 'month':
             # Get data for the selected month(s)
-            queryset = BusinessDay.objects.filter(start_date__gte=start_date, end_date__lte=end_date) \
+            queryset = BusinessDay.objects.filter(user=request.user, start_date__gte=start_date, end_date__lte=end_date) \
                                           .annotate(month=TruncMonth('start_date')) \
                                           .values('month') \
                                           .annotate(total_sales=Sum('total_sales')) \
                                           .order_by('month')
         elif timeframe == 'custom':
             # Custom range of dates
-            queryset = BusinessDay.objects.filter(start_date__gte=start_date, end_date__lte=end_date) \
+            queryset = BusinessDay.objects.filter(user=request.user, start_date__gte=start_date, end_date__lte=end_date) \
                                           .annotate(month=TruncMonth('start_date')) \
                                           .values('month') \
                                           .annotate(total_sales=Sum('total_sales')) \
@@ -725,6 +832,8 @@ def reports_data(request):
 
 
 def print_receipt_view(request, bill_id):
+    if testingReciept:
+        return JsonResponse({'success': True})
     # Get the bill and items for the specified bill_id
     bill = get_object_or_404(Bill, id=bill_id)
     items = BillItem.objects.filter(bill=bill)
@@ -818,14 +927,24 @@ def settings(request):
     context = {'rates': rates}
     return render(request, "ESdashboard\settings.html", context)
 
+
 @local_admin_required
 @login_required
 def add_rate(request):
     if request.method == "POST":
         rate_name = request.POST['rate_name']
-        price = request.POST['per_minute_rate']
-        Rate.objects.create(user=request.user, name=rate_name, per_minute_rate=price)
+        per_hour_rate = int(request.POST['per_hour_rate'])  # Accept per-hour rate as input
+        per_minute_rate = per_hour_rate / 60  # Calculate per-minute rate
+        
+        # Create the Rate object with both rates
+        Rate.objects.create(
+            user=request.user,
+            name=rate_name,
+            per_hour_rate=per_hour_rate,
+            per_minute_rate=per_minute_rate
+        )
     return redirect('settings')
+
 
 @local_admin_required
 @login_required
@@ -833,9 +952,12 @@ def edit_rate(request, rate_id):
     rate = get_object_or_404(Rate, id=rate_id, user=request.user)
     if request.method == "POST":
         rate.name = request.POST['rate_name']
-        rate.per_minute_rate = request.POST['per_minute_rate']
+        per_hour_rate = int(request.POST['per_hour_rate'])
+        rate.per_hour_rate = int(request.POST['per_hour_rate'])
+        rate.per_minute_rate = per_hour_rate / 60  # Calculate per-minute rate
         rate.save()
-    return redirect('settings')
+        return redirect('settings')
+    return render(request, 'edit_rate.html', {'rate': rate})
 
 @local_admin_required
 @login_required
@@ -843,6 +965,58 @@ def delete_rate(request, rate_id):
     rate = get_object_or_404(Rate, id=rate_id, user=request.user)
     rate.delete()
     return redirect('settings')
+
+
+def update_timer(request, table_id):
+    print("Changing SET_TIME for table:", table_id)
+    table = get_object_or_404(Table, user=request.user, table_number=table_id)
+    
+    try:
+        # Parse JSON data from the request body
+        data = json.loads(request.body)
+        additional_time_ms = data.get('additional_time')
+        print('TIME TO:', additional_time_ms)
+        
+        if additional_time_ms is None:
+            return JsonResponse({"error": "Invalid data, additional_time is missing"}, status=400)
+
+        # Convert additional_time_ms to timedelta
+        additional_time = timedelta(milliseconds=additional_time_ms)
+        
+        # Initialize set_time to 0 timedelta if it's NULL
+        if table.set_time is None:
+            table.set_time = timedelta()
+        
+        # Add the additional time to set_time
+        table.set_time += additional_time
+        table.save()
+
+        return JsonResponse({"success": True, "new_set_time": table.set_time.total_seconds() * 1000})
+    
+    except json.JSONDecodeError as e:
+        return JsonResponse({"error": "Invalid JSON data"}, status=400)
+    
+
+def get_table_data(request):
+    tables = Table.objects.filter(user=request.user)
+    data = [
+        {
+            "table_number": table.table_number,
+            "relay_id": table.relay_id,
+            "state": table.state,
+            "start_time": table.start_time.isoformat() if table.start_time else None,
+            "total_billing": table.total_billing,
+            "rate_id": table.ratePmin_id,
+            "rate_per_minute": table.ratePmin.per_minute_rate if table.ratePmin else None,
+            "set_time": str(table.set_time) if table.set_time else "-",
+            "start_table_url": f"/start_table/{table.id}/",
+            "bill_id": table.current_bill,
+            "unique_id": table.id,
+        }
+        for table in tables
+    ]
+    return JsonResponse({"tables": data})
+
 
 """
 
@@ -886,4 +1060,12 @@ versi kabel
     minimal payment (rounding)
 3.) Print on Stop.
     Reciept needs a change function and input to put in cash recieved.
+
+
+    edit table time ('nambah 1 jam')
+    signup errors
+
+    
+
+    TIMER PROBLEMS LMAOOOOOO
 """

@@ -129,31 +129,20 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="table-responsive">
-                    <table id="bill" class="table">
-                        <thead>
-                            <tr>
-                                <th class="text-light">Item</th>
-                                <th class="text-light">Quantity</th>
-                                <th class="text-light">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody id="billing-items">
-                            <!-- Items will be dynamically populated -->
-                        </tbody>
-                        <tfoot>
-                            <tr>
-                                <td class="fw-bold text-success">TOTAL</td>
-                                <td></td>
-                                <td class="fw-bold text-success" id="total-billing"></td>
-                            </tr>
-                        </tfoot>
-                    </table>
+                <table class="table" id="billing-items"></table>
+                <div class="mb-3">
+                    <label for="discountInput" class="form-label">Discount (%)</label>
+                    <input type="number" id="discountInput" class="form-control" placeholder="Enter discount">
                 </div>
+                <div class="mb-3">
+                    <label for="MoneyRecieved" class="form-label">Cash Received</label>
+                    <input type="number" id="MoneyRecieved" class="form-control" placeholder="Enter amount received">
+                </div>
+                <h5>Total: <span id="total-billing" class="text-danger fw-bold">0.00</span></h5>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-light" type="button" data-bs-dismiss="modal">CETAK</button>
-                <button class="btn btn-light" id="payButton" type="button" data-bs-dismiss="modal">BAYAR</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button id="payButton" class="btn btn-primary" data-total-amount="0">Pay</button>
             </div>
         </div>
     </div>

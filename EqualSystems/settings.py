@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-e--ot+zao7k^7h%-1y%3=m95+v-7(bm&y8+wlawe^7lvlbd-wc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['192.168.18.8']
 
 
 # Application definition
@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'ESdashboard',
     'django.contrib.humanize',
+    'channels'
 ]
 
 MIDDLEWARE = [
@@ -71,7 +72,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'EqualSystems.wsgi.application'
 
-
+ASGI_APPLICATION = 'EqualSystems.asgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 

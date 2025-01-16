@@ -16,7 +16,8 @@ class CustomUser(AbstractUser):
 class Rate(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
-    per_minute_rate = models.PositiveIntegerField()  # The rate per minute (e.g., 500)
+    per_minute_rate = models.FloatField() # The rate per minute (e.g., 500)
+    per_hour_rate = models.PositiveIntegerField()
 
     def __str__(self):
         return f"{self.name} - {self.per_minute_rate} per minute"    
@@ -26,7 +27,7 @@ class Table(models.Model):
     table_number = models.PositiveIntegerField()
     ratePmin = models.ForeignKey(Rate, on_delete=models.SET_NULL, null=True, blank=True)
     relay_id = models.PositiveIntegerField()
-    start_time = models.DateTimeField(auto_now_add=True, null=True)
+    start_time = models.DateTimeField(auto_now_add=False, null=True)
     end_time = models.DateTimeField(null=True, blank=True)
     duration = models.DurationField(null=True)
     set_time = models.DurationField(null=True)
@@ -84,6 +85,12 @@ class Bill(models.Model):
     end_time = models.DateTimeField(null=True, blank=True)
     duration = models.DurationField(null=True)
     total_amount = models.DecimalField(max_digits=20, decimal_places=2, default=0.00)
+    percentdiscount = models.DecimalField(
+        max_digits=5,  # Maximum number of digits in total
+        decimal_places=2,  # Number of digits after the decimal point
+        default=0.00,
+        help_text="Enter the percentage as a decimal value (e.g., 25.50 for 25.5%)."
+    )
     is_paid = models.BooleanField(default=False)
     customer_name = models.CharField(max_length=255, null=True, blank=True)  # Can be empty if not provided
     def __str__(self):

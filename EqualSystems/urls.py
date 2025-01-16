@@ -50,4 +50,6 @@ urlpatterns = [
     path('admin_panel/settings/add_rate/', views.add_rate, name='add_rate'),
     path('admin_panel/settings/edit_rate/<int:rate_id>/', views.edit_rate, name='edit_rate'),
     path('admin_panel/settings/delete_rate/<int:rate_id>/', views.delete_rate, name='delete_rate'),
+    path('update_timer/<int:table_id>/', views.update_timer, name='update_timer'),
+    path('api/get_table_data/', views.get_table_data, name='get_table_data'),
 ]

@@ -11,11 +11,13 @@ function handleButtonClick(button) {
     const ratePmin = button.getAttribute('data-selected-ratepMin');
     const billTotal = button.getAttribute('data-bill-total');
     const billId = button.getAttribute('data-bill-id');
-    
-    console.log('ButtonHanle set rate to: ', rate_id, ratePmin)
+    const startTime = new Date(button.getAttribute('data-start-time'));
+    console.log('ButtonHanle set rate to: ', rate_id, ratePmin, 'timestart: ', startTime)
     if (state == 1) {
         // Code for handling the Stop modal
         const stopModal = new bootstrap.Modal(document.getElementById('modal-2'));
+        const addButton = document.getElementById('addTime')
+        
         const stopButton = document.querySelector('#modal-2 .stop-table-btn');
         stopButton.setAttribute('data-table-id', tableId);
         stopButton.setAttribute('data-relay-id', relayId);
@@ -24,8 +26,20 @@ function handleButtonClick(button) {
         stopButton.setAttribute('data-selected-rate-id', rate_id);
         stopButton.setAttribute('data-bill-id', billId);
         
+        addButton.setAttribute('data-table-id', tableId);
+        addButton.setAttribute('data-start-time', startTime);
+        addButton.setAttribute('data-relay-id', relayId);
+        addButton.setAttribute('data-url', url);
+        addButton.setAttribute('data-table-name', tableName);
+        addButton.setAttribute('data-selected-rate-id', rate_id);
+        addButton.setAttribute('data-bill-id', billId);
         document.getElementById("modal-2-label").innerText = `Stop ${tableName}`;
-
+        
+        const now = new Date();
+        const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));  // Convert to minutes
+        const tableBillingCostReal = (elapsedMinutes * ratePmin);
+        const tableBillingCost = (tableBillingCostReal + 1000).toFixed(0)  // Calculate cost
+        
         // AJAX request to get the bill items for the selected table
         fetch(`/get-bill-items/${tableId}/`)
             .then(response => response.json())
@@ -33,6 +47,7 @@ function handleButtonClick(button) {
                 const billTableBody = document.querySelector('#bill tbody');
                 billTableBody.innerHTML = '';  // Clear existing table rows
 
+                // Add each item from the fetched data
                 data.items.forEach(item => {
                     const row = `<tr>
                         <td class="text-light">${item.product_name}</td>
@@ -42,18 +57,26 @@ function handleButtonClick(button) {
                     billTableBody.insertAdjacentHTML('beforeend', row);
                 });
 
+                // Add table duration and cost row
+                const durationRow = `<tr>
+                    <td class="text-light">Table Time</td>
+                    <td class="text-light">${elapsedMinutes} min</td>
+                    <td class="text-light">${tableBillingCost}</td>
+                </tr>`;
+                billTableBody.insertAdjacentHTML('beforeend', durationRow);
+
                 // Add the total row
                 const totalRow = `<tr>
                     <td class="fw-bold text-success" style="border-top: 1px solid var(--bs-secondary);">TOTAL</td>
                     <td class="text-success" style="border-top: 1px solid var(--bs-secondary);"></td>
-                    <td class="fw-bold text-success" style="border-top: 1px solid var(--bs-secondary);">${data.total}</td>
+                    <td class="fw-bold text-success" style="border-top: 1px solid var(--bs-secondary);">${(parseFloat(data.total) + parseFloat(tableBillingCost)).toFixed(0)}</td>
                 </tr>`;
                 billTableBody.insertAdjacentHTML('beforeend', totalRow);
             })
             .catch(error => console.error('Error fetching bill items:', error));
 
         stopModal.show();
-    } else {
+    } else if(state == 0) {
         // Set the table number and customer name in the modal title
         document.getElementById('modal-table-number').textContent = tableId;
         document.getElementById('modal-customer-name').textContent = customerName;
@@ -83,7 +106,7 @@ document.getElementById('modal-3').addEventListener('hidden.bs.modal', function 
     document.getElementById('timem').value = '';
 });
 
-
+//START TABLE MOAL
 function handleTableStateChange3(button) {
     const tableId = button.getAttribute('data-table-id');
     const relayId = button.getAttribute('data-relay-id');
@@ -180,6 +203,7 @@ function handleTableStateChange3(button) {
             console.error("Error while opening the table:", error, status, xhr);
         }
     });
+    //location.reload();
 }
 
 
@@ -271,6 +295,69 @@ function handleTableStateChange2(button) {
         }
     })
     .catch(error => console.error('Error:', error));
+
+    location.reload();
+}
+
+function addTime(button) {
+        const tableId = button.getAttribute('data-table-id')
+        const relayId = button.getAttribute('data-relay-id');
+        const state = button.getAttribute('data-state');
+        const url = button.getAttribute('data-url');
+        const tableName = button.getAttribute('name');
+        const starturl = button.getAttribute('data-start-table-url');
+        const setTime = button.getAttribute('data-settime');
+        const customerName = button.getAttribute('data-customer-name') || 'New Customer'; // Default if no customer name provided
+        const rate_id = button.getAttribute('data-selected-rate-id');
+        const ratePmin = button.getAttribute('data-selected-ratepMin');
+        const billTotal = button.getAttribute('data-bill-total');
+        const billId = button.getAttribute('data-bill-id');
+        const startTime = new Date(button.getAttribute('data-start-time'));
+
+    // Set the table number and customer name in the modal title
+        document.getElementById('modal-table-number').textContent = tableId;
+        document.getElementById('modal-customer-name').textContent = customerName;
+
+        const openModal = new bootstrap.Modal(document.getElementById('modal-addTime'));
+        const openButton = document.querySelector('#modal-addTime .open-table-btn');
+        openButton.setAttribute('data-table-id', tableId);
+        openButton.setAttribute('data-relay-id', relayId);
+        openButton.setAttribute('data-url', url);
+        openButton.setAttribute('data-table-name', tableName);
+        openButton.setAttribute('data-start-table-url', starturl);
+        openButton.setAttribute('data-settime', setTime);
+        openButton.setAttribute('data-selected-rate-id', rate_id);
+        openButton.setAttribute('data-selected-rate-value', ratePmin);
+        openButton.setAttribute('data-bill-total', billTotal);
+        openButton.setAttribute('data-start-time', startTime);
+
+        openModal.show();
+}
+
+function setTimeAfter(button) {
+    console.log('CALL SET TIME!!!!!')
+    const tableId = button.getAttribute('data-table-id');
+    const relayId = button.getAttribute('data-relay-id');
+    const state = button.getAttribute('data-state');
+    const url = button.getAttribute('data-url');
+    const tableName = button.getAttribute('name');
+    const starturl = button.getAttribute('data-start-table-url');
+    const setTime = button.getAttribute('data-settime');
+    const customerName = button.getAttribute('data-customer-name') || 'New Customer'; // Default if no customer name provided
+    const rate_id = button.getAttribute('data-selected-rate-id');
+    const ratePmin = button.getAttribute('data-selected-ratepMin');
+    const billTotal = button.getAttribute('data-bill-total');
+    const billId = button.getAttribute('data-bill-id');
+    const startTime = new Date(button.getAttribute('data-start-time'));
+    
+
+    const hours = parseInt(document.getElementById('timeha').value) || 0;
+    const minutes = parseInt(document.getElementById('timema').value) || 0;
+
+    const totalTimeMs = (hours * 60 * 60 * 1000) + (minutes * 60 * 1000);
+    console.log('Table, StarTime, Hours, Minutes, TimeMS: ',tableId, startTime, hours, minutes, totalTimeMs)
+    addTimer(tableId, totalTimeMs);
+    location.reload();
 }
 
 document.getElementById('startall').addEventListener('click', function() {
@@ -448,9 +535,9 @@ function updateTableDuration(tableId, startTime, tableState, ratePerMinute, bill
         // Calculate current billing based on elapsed time and rate per minute
         const elapsedMinutes = Math.floor(elapsedTimeMs / 60000);
         const currentBilling = (elapsedMinutes * ratePerMinute).toFixed(2);
-        const finalBilling = Number(currentBilling) + Number(billTotal);
+        const finalBilling = Number(currentBilling) + Number(billTotal) + 1000;
 
-        console.log("Elapse time: ",elapsedMinutes, " \n ratePerMinute: ",ratePerMinute)
+        //console.log("Elapse time: ",elapsedMinutes, " \n ratePerMinute: ",ratePerMinute)
         // Update the billing label
         billingLabel.innerHTML = `Billing: ${finalBilling}`;
 
@@ -465,56 +552,42 @@ function updateTableDuration(tableId, startTime, tableState, ratePerMinute, bill
 }
 
 
-
+// Countdown intervals mapped by tableId
 const countdownIntervalid = {};
-// Countdown timer function
-function startCountdown(tableId, totalTimeMs, startTime) {
-    console.log("start count call...")
+const countdownTimeRemaining = {}; // Store remaining time for each table
+
+function startCountdown(tableId, totalTimeMs, startTime, newTimer) {
+
+    console.log("TABLE, TOTALTIMEMS, ST: ", tableId, totalTimeMs, startTime)
     const labelElement = document.getElementById(`timeleft-${tableId}`);
-    
-    // Parse startTime to a Date object
+    const button = document.getElementById(tableId);
     const start = new Date(startTime);
     const currentTime = new Date();
-    console.log('recieved time set: ', totalTimeMs)
-    console.log(startTime)
-    
+    const elapsedTimeMs = currentTime - start;
+    let remainingTime = totalTimeMs - elapsedTimeMs;
+
     if (isNaN(start.getTime()) || isNaN(totalTimeMs)) {
         labelElement.innerHTML = "-";
         return;
     }
 
-    if (totalTimeMs == '' || startTime == '') {
+    if (totalTimeMs === '' || startTime === '') {
         labelElement.innerHTML = '-';
         return; // Skip the countdown
     }
 
-    // Calculate the elapsed time in milliseconds
-    const elapsedTimeMs = currentTime - start;
-
-
-
-    let remainingTime = totalTimeMs - elapsedTimeMs;
-    console.log('Remaining TIme: ', remainingTime)
-
     if (remainingTime <= 0) {
-        labelElement.innerHTML = "-";
-        clearInterval(countdownIntervalid[tableId]);
         labelElement.innerHTML = "Time's up!";
-        const button = document.getElementById(tableId);
+        clearInterval(countdownIntervalid[tableId]);
         timeupStop(button);
         return;
     }
-    
+
     countdownIntervalid[tableId] = setInterval(() => {
         if (remainingTime <= 0) {
             clearInterval(countdownIntervalid[tableId]);
             labelElement.innerHTML = "Time's up!";
-            const button = document.getElementById(tableId);
-            console.log(button)
-            if (button) {
-                timeupStop(button);
-
-            }
+            timeupStop(button);
             return;
         }
 
@@ -525,8 +598,57 @@ function startCountdown(tableId, totalTimeMs, startTime) {
         const seconds = Math.floor((remainingTime / 1000) % 60);
 
         labelElement.innerHTML = `${hours}h ${minutes}m ${seconds}s`;
+
+        // Save remaining time every minute
+        if (remainingTime % 60000 === 0) {
+            saveTimerState(tableId, remainingTime);
+        }
     }, 1000);
 }
+
+function saveTimerState(tableId, remainingTime) {
+    console.log(`Saving timer state for table ${tableId} with remaining time: ${remainingTime}`);
+    fetch(`/update_timer/${tableId}/`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie("csrftoken"),
+        },
+        body: JSON.stringify({
+            table_id: tableId,
+            additional_time: remainingTime,
+            
+        })
+      }).then(response => response.json())
+      .then(data => {
+          console.log("Timer state saved:", data);
+      });
+}
+
+
+function addTimer(tableId, additionalTimeMs) {
+    console.log(`Adding ${additionalTimeMs}ms to table ${tableId}`);
+    
+    // Check if there's an existing countdown
+    if (countdownTimeRemaining[tableId] != null) {
+        // Add time to the existing countdown
+        countdownTimeRemaining[tableId] += additionalTimeMs;
+        console.log(`Updated countdown time remaining for table ${tableId}: ${countdownTimeRemaining[tableId]}ms`);
+    } else {
+        // Start a new countdown if one doesn't exist
+        countdownTimeRemaining[tableId] = additionalTimeMs;
+        console.log(`Starting a new countdown for table ${tableId} with ${additionalTimeMs}ms`);
+    }
+
+    // Always start a new interval or refresh the existing one
+    const currentTime = new Date();
+    startCountdown(tableId, countdownTimeRemaining[tableId], currentTime.toISOString(), true);
+
+    // Save the updated timer state to the backend
+    saveTimerState(tableId, additionalTimeMs);
+}
+
+
 
 //Set time times up function
 function timeupStop(button) {
@@ -653,3 +775,46 @@ document.querySelectorAll('#modal-1 .dropdown-item').forEach(item => {
     });
 });
 
+function updateButtonData() {
+    // Fetch updated table data from the server
+    fetch('/api/get_table_data/')  // Adjust the URL to match your endpoint
+        .then(response => response.json())
+        .then(data => {
+            const tables = data.tables;
+
+            // Iterate through the tables and update button attributes
+            tables.forEach(table => {
+                const button = document.getElementById(table.table_number);
+                const div = document.getElementById(`div-${table.table_number}`);
+
+                if (button) {
+                    button.setAttribute('data-relay-id', table.relay_id);
+                    button.setAttribute('data-state', table.state);
+                    button.setAttribute('data-start-time', table.start_time || '');
+                    button.setAttribute('data-bill-total', table.total_billing);
+                    button.setAttribute('data-selected-rate-id', table.rate_id);
+                    button.setAttribute('data-selected-ratepMin', table.rate_per_minute || '');
+                    button.setAttribute('data-settime', table.set_time);
+                    //button.setAttribute('data-start-table-url', table.start_table_url);
+                    button.setAttribute('data-bill-id', table.bill_id);
+                    button.setAttribute('data-unique-id', table.unique_id);
+
+                    // Optionally update the button's style based on the state
+                    //if (table.state === 1) {
+                    //    button.style.backgroundColor = 'var(--bs-form-valid-color)';
+                    //    button.style.borderColor = 'var(--bs-form-valid-border-color)';
+                    if (table.state === 0) {
+                        button.style.backgroundColor = 'var(--bs-secondary)';
+                        button.style.borderColor = 'var(--bs-secondary)';
+                        div.style.border = '5.4px solid var(--bs-secondary-text-emphasis)';
+                    }
+                }
+            });
+        })
+        .catch(error => {
+            console.error('Error fetching table data:', error);
+        });
+}
+
+// Call the function periodically (e.g., every 5 seconds)
+setInterval(updateButtonData, 5000);

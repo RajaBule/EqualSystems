@@ -1,94 +1,101 @@
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", function () {
     // Process Payment Button click event
-    document.querySelectorAll(".process-payment-btn").forEach(function(button) {
-        button.addEventListener("click", function() {
+    document.querySelectorAll(".process-payment-btn").forEach(function (button) {
+        button.addEventListener("click", function () {
             const billId = this.getAttribute("data-bill-id");
 
-            // Fetch the billing data (replace with actual AJAX request if needed)
             fetch(`/get-bill-data/${billId}/`)
-                .then(response => response.json())
-                .then(data => {
+                .then((response) => response.json())
+                .then((data) => {
                     const billItems = data.items;
                     const totalAmount = data.total_amount;
 
                     // Populate the modal table with billing items
                     const billingItemsTable = document.getElementById("billing-items");
-                    billingItemsTable.innerHTML = '';  // Clear any existing rows
-                    console.log(billItems)
-                    billItems.forEach(item => {
+                    billingItemsTable.innerHTML = ""; // Clear existing rows
+                    billItems.forEach((item) => {
                         const row = `<tr>
                             <td class="text-light">${item.product_name}</td>
                             <td class="text-light">${item.quantity}</td>
                             <td class="text-light">${item.line_total}</td>
                         </tr>`;
-                        billingItemsTable.insertAdjacentHTML('beforeend', row);
+                        billingItemsTable.insertAdjacentHTML("beforeend", row);
                     });
 
-                    // Update the total
+                    // Update the total and add a discount input
                     document.getElementById("total-billing").innerText = totalAmount;
+                    document.getElementById("discountInput").value = ""; // Reset discount input
 
-                    // Set the bill ID in the pay button for later use
+                    document.getElementById("payButton").setAttribute("data-total-amount", totalAmount);
                     document.getElementById("payButton").setAttribute("data-bill-id", billId);
                 });
         });
     });
 
-    // Handle the payment process when "BAYAR" is clicked
-    document.getElementById("payButton").addEventListener("click", function() {
+    // Update total dynamically when discount is entered
+    document.getElementById("discountInput").addEventListener("input", function () {
+        const totalAmount = parseFloat(document.getElementById("payButton").getAttribute("data-total-amount")) || 0;
+        const discountPercent = parseFloat(this.value) || 0;
+        const discountedTotal = totalAmount * (1 - discountPercent / 100);
+        document.getElementById("total-billing").innerText = discountedTotal.toFixed(2);
+    });
+
+    // Handle payment process
+    document.getElementById("payButton").addEventListener("click", function () {
+        const totalAmount = parseFloat(this.getAttribute("data-total-amount")) || 0;
+        const cashReceived = parseFloat(document.getElementById("MoneyRecieved").value) || 0;
+        const discountPercent = parseFloat(document.getElementById("discountInput").value) || 0;
         const billId = this.getAttribute("data-bill-id");
 
-        // Mark the bill as paid (replace with actual AJAX request to your server)
+        if (cashReceived < totalAmount * (1 - discountPercent / 100)) {
+            alert("Insufficient cash received.");
+            return;
+        }
+
+        const change = cashReceived - totalAmount * (1 - discountPercent / 100);
+
         fetch(`/pay-bill/${billId}/`, {
-            method: 'POST',
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')  // Ensure CSRF token is sent with the request
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCookie("csrftoken"),
             },
-            body: JSON.stringify({ is_paid: true })
-        }).then(response => {
-            if (response.ok) {
-                alert("Payment successful!");
-                location.reload();  // Refresh the page to update the list of unpaid/paid bills
-            } else {
-                alert("Payment failed. Please try again.");
-            }
-        });
+            body: JSON.stringify({ discount: discountPercent, is_paid: true }),
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                if (data.status === "success") {
+                    alert(`Payment successful! Change: ${change.toFixed(2)}`);
+                    location.reload();
+                } else {
+                    alert("Payment failed. Please try again.");
+                }
+            })
+            .catch((error) => console.error("Error:", error));
     });
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== "") {
+            const cookies = document.cookie.split(";");
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === name + "=") {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
 });
 
-// Helper function to get CSRF token
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-document.querySelector('.modal-footer .btn[data-bs-dismiss="modal"]').addEventListener('click', function() {
-    const billId = document.getElementById("payButton").dataset.billId;
-
-    fetch(`/print_receipt/${billId}/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),  // Ensure CSRF token is sent with the request
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Receipt printed successfully!');
-        } else {
-            alert('Failed to print the receipt.');
-        }
-    })
-    .catch(error => console.error('Error:', error));
+document.getElementById("discountInput").addEventListener("input", function () {
+    let discountPercent = parseFloat(this.value) || 0;
+    if (discountPercent < 0) discountPercent = 0;
+    if (discountPercent > 100) discountPercent = 100;
+    this.value = discountPercent;
+    const totalAmount = parseFloat(document.getElementById("payButton").getAttribute("data-total-amount")) || 0;
+    const discountedTotal = totalAmount * (1 - discountPercent / 100);
+    document.getElementById("total-billing").innerText = discountedTotal.toFixed(2);
 });
