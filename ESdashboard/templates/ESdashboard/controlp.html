@@ -22,11 +22,12 @@
                     </svg></span><span>Equal Systems</span></a><button data-bs-toggle="collapse" class="navbar-toggler" data-bs-target="#navcol-1"><span class="visually-hidden">Toggle navigation</span><span class="navbar-toggler-icon"></span></button>
             <div class="collapse navbar-collapse" id="navcol-1">
                 <ul class="navbar-nav mx-auto">
+                    <li class="nav-item"><a class="nav-link" href="#">Meja</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'billing' %}">Billing</a></li>
-                    <li class="nav-item"><a class="nav-link" href="services.html">Catatan</a></li>
+                    <li style="display: none;" class="nav-item"><a class="nav-link" href="services.html">Catatan</a></li>
                     <li class="nav-item"></li>
-                    <li class="nav-item"><a class="nav-link" href="pricing.html">Reports</a></li>
-                    <li class="nav-item"><a class="nav-link" href="contacts.html">Members</a></li>
+                    <li style="display: none;" class="nav-item"><a class="nav-link" href="pricing.html">Reports</a></li>
+                    <li style="display: none;" class="nav-item"><a class="nav-link" href="contacts.html">Members</a></li>
                     </ul><a class="btn btn-primary shadow" role="button" href="{% url 'adminp' %}" style="background: var(--bs-secondary);border-style: solid;border-color: var(--bs-secondary);">Admin Panel</a>
             </div>
         </div>
@@ -272,6 +273,7 @@
                     data-selected-rate-id=""
                     data-bill-id=""
                     data-start-time=""
+                    data-settime=""
                     onclick="addTime(this)">Nambah Waktu</button>
                     <button class="btn btn-light" type="button" data-bs-dismiss="modal" style="background: var(--bs-form-valid-color);border-color: var(--bs-form-valid-border-color);">BAYAR</button>
                     <button name="stop" class="btn btn-primary link-dark stop-table-btn" type="button" 

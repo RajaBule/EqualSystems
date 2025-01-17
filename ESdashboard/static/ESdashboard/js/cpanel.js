@@ -33,6 +33,7 @@ function handleButtonClick(button) {
         addButton.setAttribute('data-table-name', tableName);
         addButton.setAttribute('data-selected-rate-id', rate_id);
         addButton.setAttribute('data-bill-id', billId);
+        addButton.setAttribute('data-settime', setTime);
         document.getElementById("modal-2-label").innerText = `Stop ${tableName}`;
         
         const now = new Date();
@@ -165,7 +166,7 @@ function handleTableStateChange3(button) {
                 if (hours > 0 || minutes > 0) {
                     console.log(`Starting countdown: ${hours} hours, ${minutes} minutes`);
                     // Start the countdown based on user input
-                    startCountdown(tableId, totalTimeMs, startTime);
+                    startCountdown(tableId, totalTimeMs, startTime, "Start");
                 } else {
                     console.log('No timer set, skipping countdown');
                 }
@@ -349,14 +350,22 @@ function setTimeAfter(button) {
     const billTotal = button.getAttribute('data-bill-total');
     const billId = button.getAttribute('data-bill-id');
     const startTime = new Date(button.getAttribute('data-start-time'));
+    let setTimeCheck = false
+    // Get the current time
+    const currentTime = new Date();
     
+    // Calculate elapsed time in milliseconds
+    const elapsedTimeMs = currentTime - startTime;
+    if (setTime !== '-' && setTime !== 'None') {
+        setTimeCheck = true
+    }
 
     const hours = parseInt(document.getElementById('timeha').value) || 0;
     const minutes = parseInt(document.getElementById('timema').value) || 0;
 
     const totalTimeMs = (hours * 60 * 60 * 1000) + (minutes * 60 * 1000);
     console.log('Table, StarTime, Hours, Minutes, TimeMS: ',tableId, startTime, hours, minutes, totalTimeMs)
-    addTimer(tableId, totalTimeMs);
+    addTimer(tableId, totalTimeMs,elapsedTimeMs,setTimeCheck,setTime);
     location.reload();
 }
 
@@ -556,14 +565,15 @@ function updateTableDuration(tableId, startTime, tableState, ratePerMinute, bill
 const countdownIntervalid = {};
 const countdownTimeRemaining = {}; // Store remaining time for each table
 
-function startCountdown(tableId, totalTimeMs, startTime, newTimer) {
+function startCountdown(tableId, totalTimeMs, startTime, calledFrom) {
+    console.log("TABLE, TOTALTIMEMS, ST: ", tableId, totalTimeMs, startTime);
 
-    console.log("TABLE, TOTALTIMEMS, ST: ", tableId, totalTimeMs, startTime)
     const labelElement = document.getElementById(`timeleft-${tableId}`);
     const button = document.getElementById(tableId);
     const start = new Date(startTime);
     const currentTime = new Date();
     const elapsedTimeMs = currentTime - start;
+
     let remainingTime = totalTimeMs - elapsedTimeMs;
 
     if (isNaN(start.getTime()) || isNaN(totalTimeMs)) {
@@ -600,13 +610,13 @@ function startCountdown(tableId, totalTimeMs, startTime, newTimer) {
         labelElement.innerHTML = `${hours}h ${minutes}m ${seconds}s`;
 
         // Save remaining time every minute
-        if (remainingTime % 60000 === 0) {
-            saveTimerState(tableId, remainingTime);
-        }
+        //if (remainingTime % 60000 === 0) {
+        //    saveTimerState(tableId, remainingTime);
+        //}
     }, 1000);
 }
 
-function saveTimerState(tableId, remainingTime) {
+function saveTimerState(tableId, remainingTime, esTime) {
     console.log(`Saving timer state for table ${tableId} with remaining time: ${remainingTime}`);
     fetch(`/update_timer/${tableId}/`, {
         method: "POST",
@@ -617,40 +627,71 @@ function saveTimerState(tableId, remainingTime) {
         body: JSON.stringify({
             table_id: tableId,
             additional_time: remainingTime,
-            
+            esTime: esTime,
         })
-      }).then(response => response.json())
+    }).then(response => response.json())
       .then(data => {
           console.log("Timer state saved:", data);
       });
 }
 
-
-function addTimer(tableId, additionalTimeMs) {
+function addTimer(tableId, additionalTimeMs, elapsedTimeMs, setTimeCheck,setTime) {
     console.log(`Adding ${additionalTimeMs}ms to table ${tableId}`);
+    console.log(countdownTimeRemaining[tableId])
+    Object.keys(countdownTimeRemaining).forEach(tableId => {
+        console.log(countdownTimeRemaining[tableId]);
+    });
     
     // Check if there's an existing countdown
-    if (countdownTimeRemaining[tableId] != null) {
-        // Add time to the existing countdown
+    if (setTimeCheck && countdownTimeRemaining[tableId]) {
+        console.log("TimeeCheck: ", setTimeCheck)
+        console.log("TimeRemaining: ", countdownTimeRemaining[tableId])
+        // Add time to the existing countdown, but don't subtract elapsed time
         countdownTimeRemaining[tableId] += additionalTimeMs;
+        console.log(`NOT NULL: Updated countdown time remaining for table ${tableId}: ${countdownTimeRemaining[tableId]}ms`);
+        saveTimerState(tableId, additionalTimeMs, elapsedTimeMs=0);
+    }
+    else if (setTimeCheck && countdownTimeRemaining[tableId] == null) {
+        console.log("TimeeCheck: ", setTimeCheck);
+        console.log("TimeRemaining: ", countdownTimeRemaining[tableId]);
+        console.log("setTIme (raw): ", setTime);
+        console.log("ElapsedTimeMs: ", elapsedTimeMs);
+    
+        // Parse setTime into milliseconds
+        const timeParts = setTime.split(':'); // Split into [hours, minutes, seconds.milliseconds]
+        const hours = parseInt(timeParts[0]) || 0;
+        const minutes = parseInt(timeParts[1]) || 0;
+        const secondsMilliseconds = timeParts[2].split('.');
+        const seconds = parseInt(secondsMilliseconds[0]) || 0;
+        const milliseconds = parseInt(secondsMilliseconds[1]) || 0;
+    
+        const setTimeMs = (hours * 60 * 60 * 1000) + (minutes * 60 * 1000) + (seconds * 1000) + milliseconds;
+        console.log("Parsed setTimeMs: ", setTimeMs);
+    
+        // Perform the calculation
+        countdownTimeRemaining[tableId] = additionalTimeMs + setTimeMs + elapsedTimeMs;
+        console.log(`TIMECHECKOK: ${countdownTimeRemaining[tableId]} `);
         console.log(`Updated countdown time remaining for table ${tableId}: ${countdownTimeRemaining[tableId]}ms`);
-    } else {
+        saveTimerState(tableId, additionalTimeMs, elapsedTimeMs=0);
+    }
+    
+    else if (setTimeCheck != true){
         // Start a new countdown if one doesn't exist
-        countdownTimeRemaining[tableId] = additionalTimeMs;
-        console.log(`Starting a new countdown for table ${tableId} with ${additionalTimeMs}ms`);
+        countdownTimeRemaining[tableId] = additionalTimeMs + elapsedTimeMs;;
+        console.log(`NO SET TIME: Starting a new countdown for table ${tableId} with ${additionalTimeMs}ms`);
+        // Save the updated timer state to the backend
+        saveTimerState(tableId, additionalTimeMs, elapsedTimeMs);
     }
 
     // Always start a new interval or refresh the existing one
     const currentTime = new Date();
-    startCountdown(tableId, countdownTimeRemaining[tableId], currentTime.toISOString(), true);
+    startCountdown(tableId, countdownTimeRemaining[tableId], currentTime.toISOString(), "addTimer");
 
     // Save the updated timer state to the backend
-    saveTimerState(tableId, additionalTimeMs);
+    saveTimerState(tableId, additionalTimeMs, elapsedTimeMs);
 }
 
-
-
-//Set time times up function
+// Set time times up function
 function timeupStop(button) {
     // Get data from the button
     console.log('STOP CALL FOR: ')

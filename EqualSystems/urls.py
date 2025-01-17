@@ -52,4 +52,5 @@ urlpatterns = [
     path('admin_panel/settings/delete_rate/<int:rate_id>/', views.delete_rate, name='delete_rate'),
     path('update_timer/<int:table_id>/', views.update_timer, name='update_timer'),
     path('api/get_table_data/', views.get_table_data, name='get_table_data'),
+    path('print-all-receipts/', views.print_all_receipts_view, name='print_all_receipts'),
 ]

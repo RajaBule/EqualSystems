@@ -42,22 +42,22 @@
         <div class="container">
             <div class="row" style="margin-bottom: 26px;">
                 <div class="col-md-6 text-center" style="margin-top: 5px;">
-                    <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">Yearly Income</h1><label class="form-label text-center text-success" style="font-size: 45px;margin-bottom: 0px;">100.790.000</label>
+                    <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">Yearly Income</h1><label class="form-label text-center text-success" style="font-size: 45px;margin-bottom: 0px;">{{ total_sales_year|intcomma }}</label>
                 </div>
                 <div class="col-md-6 text-center" style="margin-top: 5px;">
-                    <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">Closed Bills</h1><label class="form-label text-center text-success" style="font-size: 45px;margin-bottom: 0px;">1980</label>
+                    <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">Closed Bills</h1><label class="form-label text-center text-success" style="font-size: 45px;margin-bottom: 0px;">{{ total_transactions_year }}</label>
                 </div>
             </div>
             <div class="row" style="margin-top: 30px;">
                 <div class="col-md-6 text-center" style="margin-top: 5px;">
-                    <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">Current Month</h1><label class="form-label text-center text-warning" style="font-size: 45px;margin-bottom: 0px;">1.400.500</label>
+                    <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">Current Month</h1><label class="form-label text-center text-warning" style="font-size: 45px;margin-bottom: 0px;">{{ total_sales_month|intcomma }}</label>
                 </div>
                 <div class="col-md-6 text-center" style="margin-top: 5px;">
-                    <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">Closed&nbsp;Bills</h1><label class="form-label text-center text-warning" style="font-size: 45px;margin-bottom: 0px;">19</label>
+                    <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">Closed&nbsp;Bills</h1><label class="form-label text-center text-warning" style="font-size: 45px;margin-bottom: 0px;">{{ total_transactions_month }}</label>
                 </div>
             </div>
         </div>
-        <div class="container">
+        <div class="container" style="display: none;">
             <h1 class="text-center" style="margin-top: 79px;">Analysis</h1>
         
             <!-- Dropdown to choose time frame -->
@@ -80,7 +80,7 @@
             <div><canvas id="incomeChart2" data-bss-chart="{&quot;type&quot;:&quot;bar&quot;,&quot;data&quot;:{&quot;labels&quot;:[&quot;January&quot;,&quot;February&quot;,&quot;March&quot;,&quot;April&quot;,&quot;May&quot;,&quot;June&quot;],&quot;datasets&quot;:[{&quot;label&quot;:&quot;Revenue&quot;,&quot;backgroundColor&quot;:&quot;#2d2c38&quot;,&quot;borderColor&quot;:&quot;#19f5aa&quot;,&quot;borderWidth&quot;:&quot;2&quot;,&quot;data&quot;:[&quot;4500&quot;,&quot;5300&quot;,&quot;6250&quot;,&quot;7800&quot;,&quot;9800&quot;,&quot;15000&quot;]}]},&quot;options&quot;:{&quot;maintainAspectRatio&quot;:true,&quot;legend&quot;:{&quot;display&quot;:false,&quot;labels&quot;:{&quot;fontStyle&quot;:&quot;normal&quot;}}}}}"></canvas></div>
         </div>
         
-        <div class="row" style="margin-bottom: 26px;margin-top: 18px;margin-right: 0px;margin-left: 0px;width: 100%;">
+        <div class="row" style="margin-bottom: 26px;margin-top: 18px;margin-right: 0px;margin-left: 0px;width: 100%; display: none;">
             <div class="col-md-6 text-center" style="margin-top: 5px;width: 50%;">
                 <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">Selected&nbsp;Income</h1><label class="form-label text-center text-success" style="font-size: 45px;margin-bottom: 0px;">100.790.000</label>
             </div>
@@ -88,7 +88,7 @@
                 <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">Closed Bills</h1><label class="form-label text-center text-primary" style="font-size: 45px;margin-bottom: 0px;">1980</label>
             </div>
         </div>
-        <div class="row" style="margin-bottom: 26px;margin-top: 18px;margin-right: 0px;margin-left: 0px;width: 100%;">
+        <div class="row" style="margin-bottom: 26px;margin-top: 18px;margin-right: 0px;margin-left: 0px;width: 100%;  display: none;">
             <div class="col-md-6 text-center" style="margin-top: 5px;width: 50%;">
                 <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">High Time</h1><label class="form-label text-center text-warning" style="font-size: 45px;margin-bottom: 0px;">Saturday</label>
             </div>

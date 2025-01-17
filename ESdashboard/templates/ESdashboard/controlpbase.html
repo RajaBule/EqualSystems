@@ -23,13 +23,13 @@
             <div class="collapse navbar-collapse" id="navcol-1">
                 <ul class="navbar-nav mx-auto">
                     <li class="nav-item"><a class="nav-link" href="{% url 'cpanel'  %}">Meja</a></li>
-                    <li class="nav-item"><a class="nav-link" href="index.html">Billing</a></li>
-                    <li class="nav-item"><a class="nav-link" href="services.html">Catatan</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#">Billing</a></li>
+                    <li style="display: none;" class="nav-item"><a class="nav-link" href="services.html">Catatan</a></li>
                     <li class="nav-item"></li>
-                    <li class="nav-item"><a class="nav-link" href="pricing.html">Reports</a></li>
-                    <li class="nav-item"><a class="nav-link" href="contacts.html">Members</a></li>
-                    <li class="nav-item"><a class="nav-link link-danger" href="contacts.html">Tutup Hari Ini</a></li>
-                </ul><a class="btn btn-primary shadow" role="button" href="signup.html" style="background: var(--bs-secondary);border-style: solid;border-color: var(--bs-secondary);">Admin Panel</a>
+                    <li style="display: none;" class="nav-item"><a class="nav-link" href="pricing.html">Reports</a></li>
+                    <li style="display: none;" class="nav-item"><a class="nav-link" href="contacts.html">Members</a></li>
+                    <li style="display: none;" class="nav-item"><a class="nav-link link-danger" href="contacts.html">Tutup Hari Ini</a></li>
+                </ul><a class="btn btn-primary shadow" role="button" href="{% url 'adminp' %}" style="background: var(--bs-secondary);border-style: solid;border-color: var(--bs-secondary);">Admin Panel</a>
             </div>
         </div>
     </nav>

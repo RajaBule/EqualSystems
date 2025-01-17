@@ -4,13 +4,11 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse, HttpResponseForbidden
 import requests
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, authenticate
-from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth import login, authenticate, get_user_model
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth import logout as auth_logout
-from django.contrib.auth.forms import UserCreationForm
 from .models import CustomUser
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import get_user_model
 from .models import Table, BusinessDay, Bill, BillItem, Rate, InvCatagory, Inventory
 from datetime import timedelta
 import json
@@ -23,6 +21,8 @@ from PIL import Image
 from functools import wraps
 import math
 from django.utils.dateformat import format
+from decimal import Decimal
+
 
 timezonejkt = tz('Asia/Jakarta')
 counter_value = 0
@@ -131,14 +131,20 @@ def home(request):
 def cpanel(request):
     # Get all the tables associated with the logged-in user
     user = request.user
-    user_tables = Table.objects.filter(user=request.user)
-    business_day = BusinessDay.objects.filter(user=request.user, end_date__isnull=True).first()
-    user_rates = Rate.objects.filter(user=request.user)
-    categories = InvCatagory.objects.filter(user=user).prefetch_related('catagories')  # Prefetch related inventory items
-    
+     # Check if the user is an employee of someone
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+    local_owner = employer if employer else request.user
 
+    user_tables = Table.objects.filter(user=user)
+    
+    business_day = BusinessDay.objects.filter(user=local_owner, end_date__isnull=True).first()
+    user_rates = Rate.objects.filter(user=local_owner)
+    categories = InvCatagory.objects.filter(user=local_owner).prefetch_related('catagories')  # Prefetch related inventory items
+    
+    
     # Fetch all bills for the current business day
-    bills = Bill.objects.filter(user=request.user,business_day=business_day)
+    bills = Bill.objects.filter(user=local_owner,business_day=business_day)
 
     
     for table in user_tables:
@@ -169,11 +175,16 @@ def cpanel(request):
     return render(request, 'ESdashboard/controlp.html', context)
 
 def billing(request):
+     # Check if the user is an employee of someone
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+    local_owner = employer if employer else request.user
+    
     # Get the active business day
-    bday = BusinessDay.objects.filter(user=request.user, end_date__isnull=True).first()
+    bday = BusinessDay.objects.filter(user=local_owner).latest("start_date")
 
     # Fetch all bills for the current business day
-    bills = Bill.objects.filter(user=request.user, business_day=bday)
+    bills = Bill.objects.filter(user=local_owner, business_day=bday)
 
     # For each bill, we will also gather the associated BillItems
     bill_data = []
@@ -200,6 +211,8 @@ def control_relay(request):
         state = int(request.POST.get('state'))  # 0 for stop, 1 for start
         rate_id = request.POST.get('rate_id')
         
+
+
         if request.POST.get('set_time'):
             set_time_ms = int(request.POST.get('set_time'))
             set_time = timedelta(milliseconds=set_time_ms)
@@ -210,7 +223,10 @@ def control_relay(request):
         print('Run Time: ', timezone.now())
         print('Set time: ', set_time)
         
+        
         table = Table.objects.get(user=request.user, table_number=table_id)
+
+        local_owner = table.user.filter(is_owner=True).first()
         esp32_payload = {
                 'relay_id': relay_id,
                 'state': state
@@ -218,7 +234,7 @@ def control_relay(request):
 
         if state == 0 and testingReciept != True:  # Stopping the table
             timeNow = timezone.now()
-            bill = Bill.objects.get(user=request.user, start_time=table.start_time)
+            bill = Bill.objects.get(user=local_owner, start_time=table.start_time)
             bill.end_time = timeNow
             
             # Update the end_time
@@ -233,7 +249,7 @@ def control_relay(request):
             # Update the state
             table.state = 0  # Stopped
             if rate_id:
-                table.ratePmin = Rate.objects.get(user=request.user, id=rate_id)
+                table.ratePmin = Rate.objects.get(user=local_owner, id=rate_id)
             else:    
                 table.ratePmin = Rate.objects.get(id=0)
 
@@ -241,10 +257,11 @@ def control_relay(request):
             table.save()
 
             duration_minutes = math.ceil(table.duration.total_seconds() / 60)  # Convert to minutes
-            
+
+            local_owner = table.user.filter(is_owner=True).first()
             #create bill item for customer's bill to charge for table use
             BillItem.objects.create(
-                user=table.user,
+                user=local_owner,
                 bill=bill,
                 product_name='Table',
                 quantity=duration_minutes,
@@ -334,7 +351,7 @@ def control_relay(request):
 #FOR TESTING ONLY WITHOUT ESP32 CONNECTION!
         if state == 0 and testingReciept:  # Stopping the table
             timeNow = timezone.now()
-            bill = Bill.objects.get(user=request.user, start_time=table.start_time)
+            bill = Bill.objects.get(user=local_owner, start_time=table.start_time)
             bill.end_time = timeNow
             
             # Update the end_time
@@ -358,9 +375,10 @@ def control_relay(request):
 
             duration_minutes = math.ceil(table.duration.total_seconds() / 60)  # Convert to minutes
             
+            
             #create bill item for customer's bill to charge for table use
             bill_item = BillItem.objects.create(
-                user=table.user,
+                user=local_owner,
                 bill=bill,
                 product_name='Table',
                 quantity=duration_minutes,
@@ -446,14 +464,16 @@ def start_table(request, table_id):
         
     print(customer_name)
     # Check for active business day
-    business_day = BusinessDay.objects.filter(user=request.user, end_date__isnull=True).first()
+    local_owner = table.user.filter(is_owner=True).first()
+    business_day = BusinessDay.objects.filter(user=local_owner, end_date__isnull=True).first()
     
     if not business_day:
         # Start a new business day
-        business_day = BusinessDay.objects.create(user=request.user)
+        business_day = BusinessDay.objects.create(user=local_owner)
+
 
     # Create a new bill for this table
-    new_bill = Bill.objects.create(user=table.user, table=table, business_day=business_day, customer_name=customer_name, total_amount=0.00)
+    new_bill = Bill.objects.create(user=local_owner, table=table, business_day=business_day, customer_name=customer_name, total_amount=0.00)
     new_bill.start_time = table.start_time
     table.current_bill = new_bill.id
     new_bill.save()
@@ -485,8 +505,12 @@ def end_of_day_sales_summary(request):
 
 def start_day(request):
     if request.method == 'POST':
+        # Check if the user is an employee of someone
+        employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+        local_owner = employer if employer else request.user
         # Check if there is an ongoing business day for the user
-        ongoing_day = BusinessDay.objects.filter(user=request.user, end_date=None).exists()
+        ongoing_day = BusinessDay.objects.filter(user=local_owner, end_date=None).exists()
         
         if ongoing_day:
             return JsonResponse({'status': 'error', 'message': 'There is already an ongoing business day.'}, status=400)
@@ -494,7 +518,7 @@ def start_day(request):
             for table in Table.objects.filter(user=request.user):
                 table.state = 0
         # Logic to start the business day
-        BusinessDay.objects.create(user=request.user)
+        BusinessDay.objects.create(user=local_owner)
 
         return JsonResponse({'status': 'success', 'message': 'Business day started.'})
     return JsonResponse({'status': 'error', 'message': 'Invalid request.'}, status=400)
@@ -518,12 +542,14 @@ def add_purchase(request):
             if not bill:
                 return JsonResponse({'status': 'error', 'message': 'No Bill'}, status=400)
             
+
+            local_owner = table.user.filter(is_owner=True).first()
             # Get the item from the inventory
-            inventory_item = Inventory.objects.get(product_name=item_name, user=table.user)
+            inventory_item = Inventory.objects.get(product_name=item_name, user=local_owner)
             
             # Create a new BillItem for the purchase
             bill_item = BillItem.objects.create(
-                user=table.user,
+                user=local_owner,
                 bill=bill,
                 product_name=inventory_item.product_name,
                 quantity=int(quantity),
@@ -547,9 +573,13 @@ def add_purchase(request):
 def get_bill_items(request, table_id):
     # Assuming that table_id corresponds to the Bill and BillItems
     try:
+        # Check if the user is an employee of someone
+        employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+        local_owner = employer if employer else request.user
         table = Table.objects.get(user=request.user, table_number=table_id)
         # Get the current bill for the table
-        bill = Bill.objects.get(user=request.user, table__id=table.id, end_time=None)  # Adjust status if needed
+        bill = Bill.objects.get(user=local_owner, table__id=table.id, end_time=None)  # Adjust status if needed
 
         # Get all bill items for this bill
         bill_items = BillItem.objects.filter(bill=bill)
@@ -598,9 +628,21 @@ def pay_bill(request, bill_id):
         try:
             bill = Bill.objects.get(id=bill_id)
             data = json.loads(request.body)
+
             discount_percent = data.get("discount", 0)  # Get discount from request
             bill.percentdiscount = discount_percent  # Save discount to the bill
+
+            subtotal_amount = bill.total_amount
+            total_amount = bill.total_amount
+
+            discount = (Decimal(discount_percent) / Decimal('100')) * total_amount
+            discounted_total = total_amount - discount
+
+            bill.total_amount = discounted_total
+            bill.subtotal_amount = subtotal_amount
+
             bill.is_paid = True
+
             bill.save()
             return JsonResponse({'status': 'success'})
         except Bill.DoesNotExist:
@@ -614,9 +656,12 @@ def pay_bill(request, bill_id):
 def adminp(request):
     user = request.user
     current_time = timezone.now()
-
+    # Check if the user is an employee of someone
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+    local_owner = employer if employer else user
     # Get the most recent business day
-    business_day = BusinessDay.objects.filter(user=user).order_by('-start_date').first()
+    business_day = BusinessDay.objects.filter(user=local_owner).order_by('-start_date').first()
 
     if business_day and not business_day.end_date:
         # If there's an open business day, filter the bills accordingly
@@ -632,7 +677,7 @@ def adminp(request):
         end_of_day = current_time
 
     # Filter bills by the start and end of the business day
-    bills = Bill.objects.filter(user=user, start_time__gte=start_of_day, start_time__lte=end_of_day)
+    bills = Bill.objects.filter(user=local_owner, start_time__gte=start_of_day, start_time__lte=end_of_day)
 
     # Calculate total income for the business day
     total_income = sum(bill.total_amount for bill in bills)
@@ -666,9 +711,13 @@ def adminp(request):
 def get_chart_data(request):
     user = request.user
     current_time = timezone.now()
+    # Check if the user is an employee of someone
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+    local_owner = employer if employer else request.user
 
     # Get the most recent business day
-    business_day = BusinessDay.objects.filter(user=user).order_by('-start_date').first()
+    business_day = BusinessDay.objects.filter(user=local_owner).order_by('-start_date').first()
 
     if business_day and not business_day.end_date:
         start_of_day = business_day.start_date
@@ -682,7 +731,7 @@ def get_chart_data(request):
 
     # Aggregate closed bills into 30-minute intervals
     bills = (Bill.objects
-             .filter(user=user, end_time__gte=start_of_day, end_time__lte=end_of_day, is_paid=True)
+             .filter(user=local_owner, end_time__gte=start_of_day, end_time__lte=end_of_day, is_paid=True)
              .annotate(interval=TruncMinute('end_time'))
              .values('interval')
              .annotate(total_income=Sum('total_amount'))
@@ -717,56 +766,99 @@ def get_chart_data(request):
 @local_admin_required
 @login_required
 def inventory(request):
+    # Check if the user is an employee of someone
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+    local_owner = employer if employer else request.user
     # Fetch the inventory items for the logged-in user
-    inventory_items = Inventory.objects.filter(user=request.user)
+    inventory_items = Inventory.objects.filter(user=local_owner)
     context = {'inventory_items': inventory_items}
     return render(request, 'ESdashboard/inventory.html', context)
 
 @local_admin_required
 @login_required
 def add_inventory(request):
+    # Check if the user is an employee of someone
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+    local_owner = employer if employer else request.user
     if request.method == "POST":
         product_name = request.POST['product_name']
         stock = request.POST['stock']
         price = request.POST['price']
         cost = request.POST['cost']
         catagory_id = request.POST['catagory']
-        catagory = get_object_or_404(InvCatagory, id=catagory_id, user=request.user)
-        Inventory.objects.create(user=request.user, product_name=product_name, stock=stock, cost=cost, price=price, catagory=catagory)
+        catagory = get_object_or_404(InvCatagory, id=catagory_id, user=local_owner)
+        Inventory.objects.create(user=local_owner, product_name=product_name, stock=stock, cost=cost, price=price, catagory=catagory)
     return redirect('inventory')
 
 @local_admin_required
 @login_required
 def edit_inventory(request, item_id):
-    item = get_object_or_404(Inventory, id=item_id, user=request.user)
+    # Check if the user is an employee of someone
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+    local_owner = employer if employer else request.user
+    item = get_object_or_404(Inventory, id=item_id, user=local_owner)
     if request.method == "POST":
         item.product_name = request.POST['product_name']
         item.stock = request.POST['stock']
         item.price = request.POST['price']
         item.cost = request.POST['cost']
         catagory_id = request.POST['catagory']
-        item.catagory = get_object_or_404(InvCatagory, id=catagory_id, user=request.user)
+        item.catagory = get_object_or_404(InvCatagory, id=catagory_id, user=local_owner)
         item.save()
     return redirect('inventory')
 
 @local_admin_required
 @login_required
 def delete_inventory(request, item_id):
-    item = get_object_or_404(Inventory, id=item_id, user=request.user)
+    # Check if the user is an employee of someone
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+    local_owner = employer if employer else request.user
+    item = get_object_or_404(Inventory, id=item_id, user=local_owner)
     item.delete()
     return redirect('inventory')
 
+
 @local_admin_required
 def reports(request):
-    # Get the current year
-    current_year = timezone.now().year
+    # Check if the user is an employee of someone
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+    local_owner = employer if employer else request.user
+    # Get the current year and month
+    current_date = timezone.now()
+    current_year = current_date.year
+    current_month = current_date.month
 
     # Query BusinessDay model and aggregate the total sales by month
-    monthly_sales = BusinessDay.objects.filter(user=request.user, start_date__year=current_year) \
+    monthly_sales = BusinessDay.objects.filter(user=local_owner, start_date__year=current_year) \
         .annotate(month=ExtractMonth('start_date')) \
         .values('month') \
         .annotate(total_sales=Sum('total_sales')) \
         .order_by('month')
+
+    # Calculate yearly statistics
+    total_sales_year = BusinessDay.objects.filter(user=local_owner, start_date__year=current_year) \
+        .aggregate(total_sales=Sum('total_sales'))['total_sales'] or 0
+
+    total_transactions_year = BusinessDay.objects.filter(user=local_owner, start_date__year=current_year) \
+        .aggregate(total_transactions=Sum('total_transactions'))['total_transactions'] or 0
+
+    # Calculate monthly statistics
+    total_sales_month = BusinessDay.objects.filter(
+        user=local_owner, 
+        start_date__year=current_year,
+        start_date__month=current_month
+    ).aggregate(total_sales=Sum('total_sales'))['total_sales'] or 0
+
+    total_transactions_month = BusinessDay.objects.filter(
+        user=local_owner, 
+        start_date__year=current_year,
+        start_date__month=current_month
+    ).aggregate(total_transactions=Sum('total_transactions'))['total_transactions'] or 0
 
     # Prepare data for the chart
     chart_data = {
@@ -787,11 +879,25 @@ def reports(request):
     for entry in monthly_sales:
         month = entry['month'] - 1  # month is 1-based, so subtract 1 for 0-based index
         chart_data['datasets'][0]['data'][month] = float(entry['total_sales']) if entry['total_sales'] is not None else 0
-    return render(request, 'ESdashboard/reports.html',{'chart_data': chart_data})
+
+    # Context to render in the template
+    context = {
+        'chart_data': chart_data,
+        'total_sales_year': total_sales_year,
+        'total_transactions_year': total_transactions_year,
+        'total_sales_month': total_sales_month,
+        'total_transactions_month': total_transactions_month
+    }
+
+    return render(request, 'ESdashboard/reports.html', context)
 
 @local_admin_required
 def reports_data(request):
     if request.method == "POST":
+        # Check if the user is an employee of someone
+        employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+        local_owner = employer if employer else request.user
         data = json.loads(request.body)
         timeframe = data.get('timeframe')
         start_date = data.get('start_date')
@@ -800,21 +906,21 @@ def reports_data(request):
         # Process the selected timeframe
         if timeframe == 'week':
             # Get data for the selected week(s)
-            queryset = BusinessDay.objects.filter(user=request.user, start_date__gte=start_date, end_date__lte=end_date) \
+            queryset = BusinessDay.objects.filter(user=local_owner, start_date__gte=start_date, end_date__lte=end_date) \
                                           .annotate(week=TruncWeek('start_date')) \
                                           .values('week') \
                                           .annotate(total_sales=Sum('total_sales')) \
                                           .order_by('week')
         elif timeframe == 'month':
             # Get data for the selected month(s)
-            queryset = BusinessDay.objects.filter(user=request.user, start_date__gte=start_date, end_date__lte=end_date) \
+            queryset = BusinessDay.objects.filter(user=local_owner, start_date__gte=start_date, end_date__lte=end_date) \
                                           .annotate(month=TruncMonth('start_date')) \
                                           .values('month') \
                                           .annotate(total_sales=Sum('total_sales')) \
                                           .order_by('month')
         elif timeframe == 'custom':
             # Custom range of dates
-            queryset = BusinessDay.objects.filter(user=request.user, start_date__gte=start_date, end_date__lte=end_date) \
+            queryset = BusinessDay.objects.filter(user=local_owner, start_date__gte=start_date, end_date__lte=end_date) \
                                           .annotate(month=TruncMonth('start_date')) \
                                           .values('month') \
                                           .annotate(total_sales=Sum('total_sales')) \
@@ -919,11 +1025,95 @@ def print_image(image_path, ser):
     
     ser.write(b'\n')  # Move to the next line after image
 
+from django.utils.html import format_html
+
+def print_all_receipts_view(request):
+    # Check if the user is an employee of someone
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+    local_owner = employer if employer else request.user
+    try:
+        # Get the most recently closed BusinessDay
+        business_day = BusinessDay.objects.filter(user=local_owner, end_date__isnull=False).latest('end_date')
+
+        # Get all unpaid bills for the closed BusinessDay
+        bills = Bill.objects.filter(
+            user=local_owner,
+            end_time__isnull=False,  # Ensure bill is closed
+            business_day=business_day,  # Match the closed BusinessDay
+        )
+
+        # Prepare receipt data
+        printed_content = []
+
+        for bill in bills:
+            printed_content.append(f'==== Customer Receipt ====\n')
+            printed_content.append(f'Table: {bill.table.table_number}\n')
+            printed_content.append(f'Customer: {bill.customer_name}\n')
+            printed_content.append(f'Subtotal: {bill.subtotal_amount}\n')
+            printed_content.append(f'Total: {bill.total_amount}\n')
+            printed_content.append('-' * 32 + '\n\n')
+
+        all_subtotal_amounts = sum(bill.subtotal_amount for bill in bills)
+        total_amounts = sum(bill.total_amount for bill in bills)
+        number_of_bills = bills.count()
+
+        total_duration_seconds = sum(bill.duration.total_seconds() for bill in bills)
+        total_duration_minutes = total_duration_seconds / 60
+        # Convert total duration to hours and minutes
+        total_duration = timedelta(minutes=total_duration_minutes)
+        hours, remainder = divmod(total_duration.total_seconds(), 3600)
+        minutes = remainder // 60
+
+        printed_content.append(f'==== SHIFT SUMMARY ====\n')
+        printed_content.append(f'Number of Bills: {number_of_bills}\n')
+        printed_content.append(f'Total Rental Hours: {int(hours)}:{int(minutes)} \n')
+        printed_content.append(f'Subtotal: {all_subtotal_amounts}\n')
+        printed_content.append(f'Total: {total_amounts}\n')
+        printed_content.append('-' * 32 + '\n\n')
+        printed_content.append('Thank you for your hard work!\n\n')
+
+        # Attempt to send content to the printer if testingReciept is False
+        if not testingReciept:
+            try:
+                ser = serial.Serial(
+                    port='COM9',  # Update this to match the COM port
+                    baudrate=9600,
+                    bytesize=serial.EIGHTBITS,
+                    parity=serial.PARITY_NONE,
+                    stopbits=serial.STOPBITS_ONE,
+                    timeout=1
+                )
+
+                ser.write(b'\x1b\x40')  # ESC @ - initialize/reset printer
+                ser.write('\n'.join(printed_content).encode('utf-8'))
+                ser.write(b'\n\n\n')  # Feed paper
+                ser.write(b'\x1d\x56\x42\x00')  # ESC i - cut paper
+                ser.close()
+
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': f"Printer error: {str(e)}"})
+
+        # Return the printed content as JSON response
+        return JsonResponse({
+            'success': True,
+            'content': format_html('<br>'.join(printed_content))  # Format content for HTML display
+        })
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+
 @local_admin_required
 @login_required
 def settings(request):
+    # Check if the user is an employee of someone
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+    local_owner = employer if employer else request.user
     # Fetch the inventory items for the logged-in user
-    rates = Rate.objects.filter(user=request.user)
+    rates = Rate.objects.filter(user=local_owner)
     context = {'rates': rates}
     return render(request, "ESdashboard\settings.html", context)
 
@@ -932,13 +1122,17 @@ def settings(request):
 @login_required
 def add_rate(request):
     if request.method == "POST":
+        # Check if the user is an employee of someone
+        employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+        local_owner = employer if employer else request.user
         rate_name = request.POST['rate_name']
         per_hour_rate = int(request.POST['per_hour_rate'])  # Accept per-hour rate as input
         per_minute_rate = per_hour_rate / 60  # Calculate per-minute rate
         
         # Create the Rate object with both rates
         Rate.objects.create(
-            user=request.user,
+            user=local_owner,
             name=rate_name,
             per_hour_rate=per_hour_rate,
             per_minute_rate=per_minute_rate
@@ -949,7 +1143,11 @@ def add_rate(request):
 @local_admin_required
 @login_required
 def edit_rate(request, rate_id):
-    rate = get_object_or_404(Rate, id=rate_id, user=request.user)
+    # Check if the user is an employee of someone
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+    local_owner = employer if employer else request.user
+    rate = get_object_or_404(Rate, id=rate_id, user=local_owner)
     if request.method == "POST":
         rate.name = request.POST['rate_name']
         per_hour_rate = int(request.POST['per_hour_rate'])
@@ -962,12 +1160,17 @@ def edit_rate(request, rate_id):
 @local_admin_required
 @login_required
 def delete_rate(request, rate_id):
-    rate = get_object_or_404(Rate, id=rate_id, user=request.user)
+    # Check if the user is an employee of someone
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    # If the user has an employer, get the employer's business day; otherwise, get the user's
+    local_owner = employer if employer else request.user
+    rate = get_object_or_404(Rate, id=rate_id, user=local_owner)
     rate.delete()
     return redirect('settings')
 
 
 def update_timer(request, table_id):
+
     print("Changing SET_TIME for table:", table_id)
     table = get_object_or_404(Table, user=request.user, table_number=table_id)
     
@@ -975,6 +1178,7 @@ def update_timer(request, table_id):
         # Parse JSON data from the request body
         data = json.loads(request.body)
         additional_time_ms = data.get('additional_time')
+        esTime = timedelta(milliseconds=data.get('esTime'))
         print('TIME TO:', additional_time_ms)
         
         if additional_time_ms is None:
@@ -988,7 +1192,7 @@ def update_timer(request, table_id):
             table.set_time = timedelta()
         
         # Add the additional time to set_time
-        table.set_time += additional_time
+        table.set_time += (additional_time + esTime)
         table.save()
 
         return JsonResponse({"success": True, "new_set_time": table.set_time.total_seconds() * 1000})
@@ -1067,5 +1271,7 @@ versi kabel
 
     
 
-    TIMER PROBLEMS LMAOOOOOO
+    TIMER PROBLEMS LMAOOOOOO 
+    STILLLLLLLLL its fkn 4 AM
+    6am. I think i fix it but its jangky AF if so. probably broken again tomorrow <O
 """

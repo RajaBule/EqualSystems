@@ -99,3 +99,44 @@ document.getElementById("discountInput").addEventListener("input", function () {
     const discountedTotal = totalAmount * (1 - discountPercent / 100);
     document.getElementById("total-billing").innerText = discountedTotal.toFixed(2);
 });
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== "") {
+        const cookies = document.cookie.split(";");
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === name + "=") {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function printAll() {
+    fetch('/print-all-receipts/', {
+        method: 'POST',
+        headers: {
+            "X-CSRFToken": getCookie("csrftoken"),  // Ensure CSRF token is included
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Display the content in a modal
+            const modalContent = document.getElementById('modalContent');
+            modalContent.innerHTML = data.content;  // Set the returned content
+
+            const modal = new bootstrap.Modal(document.getElementById('receiptModal'));
+            modal.show();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}

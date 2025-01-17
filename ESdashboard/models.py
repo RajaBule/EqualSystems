@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 from django.utils import timezone
+from decimal import Decimal, ROUND_HALF_UP
 
 
 class CustomUser(AbstractUser):
@@ -9,7 +10,11 @@ class CustomUser(AbstractUser):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
+    is_owner = models.BooleanField(default=False)
     is_local_admin = models.BooleanField(default=False)
+    is_employee = models.BooleanField(default=False)
+    employee_of = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='employees')  # Optional: link employee to admin
+
     def __str__(self):
         return self.username
     
@@ -23,7 +28,7 @@ class Rate(models.Model):
         return f"{self.name} - {self.per_minute_rate} per minute"    
 
 class Table(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='tables')
     table_number = models.PositiveIntegerField()
     ratePmin = models.ForeignKey(Rate, on_delete=models.SET_NULL, null=True, blank=True)
     relay_id = models.PositiveIntegerField()
@@ -44,7 +49,8 @@ class Table(models.Model):
         return "0h 0m 0s"
     
     def __str__(self):
-        return f"Table {self.table_number} for {self.user.username}"
+        user_names = ", ".join([user.username for user in self.user.all()])
+        return f"Table {self.table_number} for {user_names if user_names else 'No Users'}"
 
 class InvCatagory(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -84,6 +90,7 @@ class Bill(models.Model):
     start_time = models.DateTimeField(auto_now_add=True)
     end_time = models.DateTimeField(null=True, blank=True)
     duration = models.DurationField(null=True)
+    subtotal_amount = models.DecimalField(max_digits=20, decimal_places=2, default=0.00)
     total_amount = models.DecimalField(max_digits=20, decimal_places=2, default=0.00)
     percentdiscount = models.DecimalField(
         max_digits=5,  # Maximum number of digits in total
@@ -105,5 +112,16 @@ class BillItem(models.Model):
     quantity = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=20, decimal_places=2)
     linetot = models.DecimalField(max_digits=20, decimal_places=2, editable=False)  # linetot is not editable by users
+
+    def save(self, *args, **kwargs):
+        # Custom rounding function
+        def round_to_nearest_100(amount):
+            return (amount / 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP) * 100
+
+        
+        if self.linetot:
+            self.linetot = round_to_nearest_100(self.linetot)
+
+        super().save(*args, **kwargs)
     def __str__(self):
         return f"{self.quantity} x {self.product_name} for Bill {self.bill.id}"
