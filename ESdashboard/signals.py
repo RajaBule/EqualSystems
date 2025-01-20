@@ -16,9 +16,9 @@ def create_tables_for_new_user(sender, instance, created, **kwargs):
                 user=instance,
                 table_number=table_number,
                 relay_id=table_number-1,
-                duration=timedelta(hours=0),
+                #duration=timedelta(hours=0),
                 #time_left=timedelta(hours=0),
-                total_billing=0.00
+                #total_billing=0.00
             )
 
 @receiver(pre_save, sender=BillItem)

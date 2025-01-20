@@ -35,7 +35,7 @@ class Table(models.Model):
     start_time = models.DateTimeField(auto_now_add=False, null=True)
     end_time = models.DateTimeField(null=True, blank=True)
     duration = models.DurationField(null=True)
-    set_time = models.DurationField(null=True)
+    set_time = models.DateTimeField(null=True,blank=True)
     state = models.IntegerField(default=0)
     total_billing = models.DecimalField(max_digits=20, decimal_places=2)
     current_bill =  models.PositiveIntegerField(null=True, blank=True)

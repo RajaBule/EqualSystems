@@ -94,9 +94,7 @@ def sign_up(request):
             Table.objects.create(
                 user=user,
                 table_number=i,
-                duration=timedelta(hours=0),  # Default duration; adjust as needed
-                time_left=timedelta(hours=0),  # Default time_left; adjust as needed
-                total_billing=0.00  # Default billing; adjust as needed
+                 # Default billing; adjust as needed
             )
 
 
@@ -1274,4 +1272,5 @@ versi kabel
     TIMER PROBLEMS LMAOOOOOO 
     STILLLLLLLLL its fkn 4 AM
     6am. I think i fix it but its jangky AF if so. probably broken again tomorrow <O
+    Lol do a fkn timer rework ffs
 """
