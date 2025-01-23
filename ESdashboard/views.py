@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.http import (HttpResponse)
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse, HttpResponseForbidden
+from django.test import RequestFactory
 import requests
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate, get_user_model
@@ -10,19 +11,20 @@ from django.contrib.auth import logout as auth_logout
 from .models import CustomUser
 from django.contrib.auth.decorators import login_required
 from .models import Table, BusinessDay, Bill, BillItem, Rate, InvCatagory, Inventory
-from datetime import timedelta
+from datetime import timedelta, datetime
 import json
 from django.utils import timezone
 from pytz import timezone as tz
-from django.db.models import Sum, DateTimeField
-from django.db.models.functions import TruncMinute, ExtractMonth, TruncMonth, TruncWeek
+from django.db.models import Sum, F, DateTimeField
+from django.db.models.functions import TruncMinute, ExtractMonth, TruncMonth, TruncWeek, TruncHour, TruncDay, TruncWeek, TruncYear
 import serial
 from PIL import Image
 from functools import wraps
 import math
 from django.utils.dateformat import format
 from decimal import Decimal
-
+from ESdashboard import tasks
+from django.utils.dateparse import parse_datetime
 
 timezonejkt = tz('Asia/Jakarta')
 counter_value = 0
@@ -203,25 +205,29 @@ def billing(request):
 @csrf_exempt
 def control_relay(request):
     if request.method == 'POST':
+        responce_time = timezone.now()
         tbtotal = 0
         table_id = request.POST.get('table_id')
         relay_id = request.POST.get('relay_id')  # Assuming relay_id is passed in the POST request
         state = int(request.POST.get('state'))  # 0 for stop, 1 for start
         rate_id = request.POST.get('rate_id')
         
-
-
         if request.POST.get('set_time'):
             set_time_ms = int(request.POST.get('set_time'))
-            set_time = timedelta(milliseconds=set_time_ms)
+            print("IMPORTANT! SET! TiME!: ", set_time_ms)
+            if set_time_ms != 0:
+                set_time = timezone.now() + timedelta(milliseconds=set_time_ms)
+                print("IMPORTANT! SET! TiME!: ", set_time)
+            else:
+                set_time = None
+                print("IMPORTANT! SET TO NONE!")
         else:
-            set_time = None
+                set_time = None        
         print('State: ', state)
         print('Rate: ', str(rate_id))
         print('Run Time: ', timezone.now())
         print('Set time: ', set_time)
-        
-        
+                
         table = Table.objects.get(user=request.user, table_number=table_id)
 
         local_owner = table.user.filter(is_owner=True).first()
@@ -231,75 +237,20 @@ def control_relay(request):
             }
 
         if state == 0 and testingReciept != True:  # Stopping the table
-            timeNow = timezone.now()
-            bill = Bill.objects.get(user=local_owner, start_time=table.start_time)
-            bill.end_time = timeNow
-            
-            # Update the end_time
-            table.end_time = timeNow
-            # Calculate the duration based on the start_time and end_time
-            if table.start_time:
-                table.duration = table.end_time - table.start_time
-                
-            else:
-                table.duration = 0
-
-            # Update the state
-            table.state = 0  # Stopped
-            if rate_id:
-                table.ratePmin = Rate.objects.get(user=local_owner, id=rate_id)
-            else:    
-                table.ratePmin = Rate.objects.get(id=0)
-
-            bill.duration = table.duration
-            table.save()
-
-            duration_minutes = math.ceil(table.duration.total_seconds() / 60)  # Convert to minutes
-
-            local_owner = table.user.filter(is_owner=True).first()
-            #create bill item for customer's bill to charge for table use
-            BillItem.objects.create(
-                user=local_owner,
-                bill=bill,
-                product_name='Table',
-                quantity=duration_minutes,
-                price=table.ratePmin.per_minute_rate,
-                
-                )
-            
-            bill.save()
-            table.duration = None
-            table.start_time = None
-            table.set_time = None
-            table.total_billing = 0
-            table.end_time = None
-            table.current_bill = None
-            table.ratePmin = Rate.objects.get(id=0)
-            table.save()
-
-            try:
-                print('Trying to Contact ESP32')
-                esp32_response = requests.post(ESP32_URL, data=esp32_payload)
-                esp32_response.raise_for_status()  # Raise an error for bad responses (4xx, 5xx)
-
-                # Parse the response from the ESP32
-                esp32_data = esp32_response.json()
-                
-                print(esp32_data)
-                # Return a success response with the updated state and ESP32 response
-                return JsonResponse({
-                    'status': 'success',
-                    'message': 'Table state updated successfully',
-                    'updated_state': table.state,
-                    'esp32_response': esp32_data  # Optionally include ESP32 response data
-                })
-
-            except requests.exceptions.RequestException as e:
-                # Handle communication errors with ESP32
-                return JsonResponse({
-                    'status': 'error',
-                    'message': f'Failed to communicate with ESP32: {str(e)}'
-                }, status=500)
+            response = stop_table(local_owner, table_id, relay_id)
+            if response['status'] == 'success':
+                end_responce_time = timezone.now()
+                print(end_responce_time - responce_time)
+                # Notify ESP32 if needed
+                try:
+                    esp32_response = requests.post(ESP32_URL, data={'relay_id': relay_id, 'state': state})
+                    esp32_response.raise_for_status()
+                    esp32_data = esp32_response.json()
+                    response['esp32_response'] = esp32_data
+                except requests.exceptions.RequestException as e:
+                    response['status'] = 'error'
+                    response['message'] = f'Failed to communicate with ESP32: {str(e)}'
+            return JsonResponse(response)
             
         elif state == 1 and testingReciept != True:
             try:
@@ -314,6 +265,8 @@ def control_relay(request):
                 table.state = state
                 table.start_time = timezone.now()
                 table.save()
+                end_responce_time = timezone.now()
+                print(end_responce_time - responce_time)
                 print('data base updated')
 
             # Send' relay_id and state to ESP32
@@ -348,58 +301,17 @@ def control_relay(request):
 
 #FOR TESTING ONLY WITHOUT ESP32 CONNECTION!
         if state == 0 and testingReciept:  # Stopping the table
-            timeNow = timezone.now()
-            bill = Bill.objects.get(user=local_owner, start_time=table.start_time)
-            bill.end_time = timeNow
-            
-            # Update the end_time
-            table.end_time = timeNow
-            # Calculate the duration based on the start_time and end_time
-            if table.start_time:
-                table.duration = table.end_time - table.start_time
-                
-            else:
-                table.duration = 0
+            response = stop_table(local_owner, table_id, relay_id)
+            end_responce_time = timezone.now()
+            print(end_responce_time - responce_time)
+            if response['status'] == 'success':
+                print("dEBUG STATUS: ESP32 OKAY!")
+                return JsonResponse({
+                        'status': 'success',
+                        'message': 'Table state updated successfully',
+                        'updated_state': table.state,
 
-            # Update the state
-            table.state = 0  # Stopped
-            if rate_id:
-                table.ratePmin = Rate.objects.get(id=rate_id)
-            else:    
-                table.ratePmin = Rate.objects.get(id=0)
-
-            bill.duration = table.duration
-            table.save()
-
-            duration_minutes = math.ceil(table.duration.total_seconds() / 60)  # Convert to minutes
-            
-            
-            #create bill item for customer's bill to charge for table use
-            bill_item = BillItem.objects.create(
-                user=local_owner,
-                bill=bill,
-                product_name='Table',
-                quantity=duration_minutes,
-                price=table.ratePmin.per_minute_rate,
-                )
-            bill_item.linetot = bill_item.linetot + 1000
-          
-            bill.save()
-            table.duration = None
-            table.start_time = None
-            table.set_time = None
-            table.total_billing = 0
-            table.end_time = None
-            table.current_bill = None
-            table.ratePmin = Rate.objects.get(id=0)
-            table.save()
-
-            return JsonResponse({
-                    'status': 'success',
-                    'message': 'Table state updated successfully',
-                    'updated_state': table.state,
-               
-                })
+                    })
             
         elif state == 1 and testingReciept:
             try:
@@ -415,6 +327,8 @@ def control_relay(request):
                 table.start_time = timezone.now()
                 table.save()
                 print('data base updated')
+                end_responce_time = timezone.now()
+                print(end_responce_time - responce_time)
 
             # Send' relay_id and state to ESP32
             
@@ -770,8 +684,26 @@ def inventory(request):
     local_owner = employer if employer else request.user
     # Fetch the inventory items for the logged-in user
     inventory_items = Inventory.objects.filter(user=local_owner)
-    context = {'inventory_items': inventory_items}
+    category_items = InvCatagory.objects.filter(user=local_owner)
+    context = {'inventory_items': inventory_items,
+               'category_items': category_items}
     return render(request, 'ESdashboard/inventory.html', context)
+
+
+@local_admin_required
+@login_required
+def add_category(request):
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    local_owner = employer if employer else request.user
+    if request.method == "POST":
+        category_name = request.POST['category_name']
+        print(category_name)
+        if category_name:  # Check if the category name is not empty
+            InvCatagory.objects.create(user=local_owner, name=category_name)
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Category name cannot be empty.'}, status=400)
+
+    return redirect('inventory')
 
 @local_admin_required
 @login_required
@@ -788,6 +720,18 @@ def add_inventory(request):
         catagory_id = request.POST['catagory']
         catagory = get_object_or_404(InvCatagory, id=catagory_id, user=local_owner)
         Inventory.objects.create(user=local_owner, product_name=product_name, stock=stock, cost=cost, price=price, catagory=catagory)
+    return redirect('inventory')
+
+
+@local_admin_required
+@login_required
+def edit_category(request, category_id):
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    local_owner = employer if employer else request.user
+    category = get_object_or_404(InvCatagory, id=category_id, user=local_owner)
+    if request.method == "POST":
+        category.name = request.POST['category_name']
+        category.save()
     return redirect('inventory')
 
 @local_admin_required
@@ -810,6 +754,15 @@ def edit_inventory(request, item_id):
 
 @local_admin_required
 @login_required
+def delete_category(request, category_id):
+    employer = request.user.employer if hasattr(request.user, 'employer') else None
+    local_owner = employer if employer else request.user
+    category = get_object_or_404(InvCatagory, id=category_id, user=local_owner)
+    category.delete()
+    return redirect('inventory')
+
+@local_admin_required
+@login_required
 def delete_inventory(request, item_id):
     # Check if the user is an employee of someone
     employer = request.user.employer if hasattr(request.user, 'employer') else None
@@ -819,6 +772,60 @@ def delete_inventory(request, item_id):
     item.delete()
     return redirect('inventory')
 
+def test_report_view(request):
+    # Render the HTML template for the frontend
+    return render(request, 'ESdashboard/testreports.html')
+
+
+@local_admin_required
+@login_required
+def get_sales_data(request):
+    user = request.user
+    timeframe = request.GET.get('timeframe', 'daily')  # Default timeframe is daily
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+
+    # Parse custom date range
+    if start_date and end_date:
+        start_date = parse_datetime(start_date)
+        end_date = parse_datetime(end_date)
+    else:
+        start_date = None
+        end_date = None
+
+    # Determine the aggregation function based on the timeframe
+    if timeframe == 'hourly':
+        trunc_func = TruncHour
+    elif timeframe == 'daily':
+        trunc_func = TruncDay
+    elif timeframe == 'weekly':
+        trunc_func = TruncWeek
+    elif timeframe == 'monthly':
+        trunc_func = TruncMonth
+    elif timeframe == 'yearly':
+        trunc_func = TruncYear
+    else:
+        return JsonResponse({'error': 'Invalid timeframe'}, status=400)
+
+    # Filter and aggregate sales data
+    bills = Bill.objects.filter(user=user)
+    if start_date and end_date:
+        bills = bills.filter(start_time__range=(start_date, end_date))
+
+    sales_data = (
+        bills.annotate(period=trunc_func('start_time'))
+        .values('period')
+        .annotate(
+            total_sales=Sum('total_amount'),
+            total_items=Sum('items__quantity'),
+            total_transactions=Sum('id'),
+        )
+        .order_by('period')
+    )
+
+    # Convert data to a list for JSON response
+    data = list(sales_data)
+    return JsonResponse({'data': data})
 
 @local_admin_required
 def reports(request):
@@ -892,40 +899,34 @@ def reports(request):
 @local_admin_required
 def reports_data(request):
     if request.method == "POST":
-        # Check if the user is an employee of someone
         employer = request.user.employer if hasattr(request.user, 'employer') else None
-    # If the user has an employer, get the employer's business day; otherwise, get the user's
         local_owner = employer if employer else request.user
         data = json.loads(request.body)
         timeframe = data.get('timeframe')
         start_date = data.get('start_date')
         end_date = data.get('end_date')
 
-        # Process the selected timeframe
-        if timeframe == 'week':
-            # Get data for the selected week(s)
-            queryset = BusinessDay.objects.filter(user=local_owner, start_date__gte=start_date, end_date__lte=end_date) \
-                                          .annotate(week=TruncWeek('start_date')) \
-                                          .values('week') \
-                                          .annotate(total_sales=Sum('total_sales')) \
-                                          .order_by('week')
-        elif timeframe == 'month':
-            # Get data for the selected month(s)
-            queryset = BusinessDay.objects.filter(user=local_owner, start_date__gte=start_date, end_date__lte=end_date) \
-                                          .annotate(month=TruncMonth('start_date')) \
-                                          .values('month') \
-                                          .annotate(total_sales=Sum('total_sales')) \
-                                          .order_by('month')
-        elif timeframe == 'custom':
-            # Custom range of dates
-            queryset = BusinessDay.objects.filter(user=local_owner, start_date__gte=start_date, end_date__lte=end_date) \
-                                          .annotate(month=TruncMonth('start_date')) \
-                                          .values('month') \
-                                          .annotate(total_sales=Sum('total_sales')) \
-                                          .order_by('month')
+        queryset = BusinessDay.objects.filter(user=local_owner)
+        if start_date and end_date:
+            queryset = queryset.filter(start_date__gte=start_date, end_date__lte=end_date)
 
-        # Prepare data for the chart
-        labels = [str(item['week']) if timeframe == 'week' else item['month'].strftime('%B') for item in queryset]
+        if timeframe == 'hourly':
+            queryset = queryset.annotate(interval=TruncHour('start_date'))
+        elif timeframe == 'daily':
+            queryset = queryset.annotate(interval=TruncDay('start_date'))
+        elif timeframe == 'weekly':
+            queryset = queryset.annotate(interval=TruncWeek('start_date'))
+        elif timeframe == 'monthly':
+            queryset = queryset.annotate(interval=TruncMonth('start_date'))
+        elif timeframe == 'yearly':
+            queryset = queryset.annotate(interval=TruncYear('start_date'))
+        else:  # Custom or fallback
+            queryset = queryset.annotate(interval=TruncMonth('start_date'))
+
+        queryset = queryset.values('interval').annotate(total_sales=Sum('total_sales')).order_by('interval')
+
+        labels = [item['interval'].strftime('%Y-%m-%d %H:%M:%S') if timeframe == 'hourly' 
+                  else item['interval'].strftime('%Y-%m-%d') for item in queryset]
         revenue = [item['total_sales'] for item in queryset]
 
         return JsonResponse({'labels': labels, 'revenue': revenue})
@@ -935,8 +936,10 @@ def reports_data(request):
 
 
 
+
 def print_receipt_view(request, bill_id):
     if testingReciept:
+        print("deBUGGER: skipping reciept")
         return JsonResponse({'success': True})
     # Get the bill and items for the specified bill_id
     bill = get_object_or_404(Bill, id=bill_id)
@@ -1168,32 +1171,32 @@ def delete_rate(request, rate_id):
 
 
 def update_timer(request, table_id):
-
     print("Changing SET_TIME for table:", table_id)
     table = get_object_or_404(Table, user=request.user, table_number=table_id)
-    
+    start_time = table.start_time
     try:
         # Parse JSON data from the request body
         data = json.loads(request.body)
-        additional_time_ms = data.get('additional_time')
-        esTime = timedelta(milliseconds=data.get('esTime'))
+        additional_time_ms = int(data.get('additional_time'))
+        #esTime = timedelta(milliseconds=data.get('esTime'))
         print('TIME TO:', additional_time_ms)
         
         if additional_time_ms is None:
             return JsonResponse({"error": "Invalid data, additional_time is missing"}, status=400)
 
-        # Convert additional_time_ms to timedelta
-        additional_time = timedelta(milliseconds=additional_time_ms)
-        
-        # Initialize set_time to 0 timedelta if it's NULL
         if table.set_time is None:
-            table.set_time = timedelta()
-        
-        # Add the additional time to set_time
-        table.set_time += (additional_time + esTime)
+            print("deBUGGER: set_time was None. setting timer now")
+            table.set_time = timezone.now() + timedelta(milliseconds=additional_time_ms)
+        else:
+            # Add the additional time to set_time
+            set_time = table.set_time + timedelta(milliseconds=additional_time_ms)
+            table.set_time = set_time
         table.save()
-
-        return JsonResponse({"success": True, "new_set_time": table.set_time.total_seconds() * 1000})
+        
+        return JsonResponse({"success": True,
+                             "new_set_time": table.set_time,
+                              
+                              })
     
     except json.JSONDecodeError as e:
         return JsonResponse({"error": "Invalid JSON data"}, status=400)
@@ -1210,7 +1213,7 @@ def get_table_data(request):
             "total_billing": table.total_billing,
             "rate_id": table.ratePmin_id,
             "rate_per_minute": table.ratePmin.per_minute_rate if table.ratePmin else None,
-            "set_time": str(table.set_time) if table.set_time else "-",
+            "set_time": str(table.set_time) if table.set_time else None,
             "start_table_url": f"/start_table/{table.id}/",
             "bill_id": table.current_bill,
             "unique_id": table.id,
@@ -1218,6 +1221,133 @@ def get_table_data(request):
         for table in tables
     ]
     return JsonResponse({"tables": data})
+
+def count_downs(request):
+    user = request.user
+    tables = Table.objects.filter(user=user, state=1)
+    
+    print("Tables with State (1): ")
+    for table in tables:
+        print("Table# :",table.table_number)
+        if table.set_time:
+            print("Set Time: ", table.set_time)
+        else:
+            print("No set Time: ", table.set_time)    
+    current_time = timezone.now()
+    for table in tables:
+        print('Table#: ', table.table_number , '\n Set_Time: ', table.set_time)
+        # Handle countdown timer expiration
+        if table.set_time and table.set_time <= current_time:
+            # Create a mock POST request to call control_relay
+            factory = RequestFactory()
+            request = factory.post(
+                'control_relay/',
+                data={
+                    'table_id': table.table_number,
+                    'relay_id': table.relay_id,
+                    'state': 0,
+                    'rate_id': table.ratePmin.id if table.ratePmin else None,
+                }
+            )
+            request.user = user
+
+            # Call the view function directly
+            response = control_relay(request)
+
+            # Optionally, handle the response if needed
+            if response.status_code == 200:
+                print(f"Successfully stopped table {table.table_number}")
+                return JsonResponse({
+                        'status': 'success',
+                        'message': 'Table state (0) updated successfully',
+                        'updated_state': table.state,
+                        'table_changed': table.table_number
+                    })
+            else:
+                print(f"Failed to stop table {table.table_number}: {response.content}")
+
+            # Clear countdown timer
+            table.set_time = None
+            table.save()
+        else:
+            print("LOG: Table ", table.table_number, "has no timer or was not maxed out.")
+            print()
+            
+    return JsonResponse({
+                    'status': 'error',
+                    'message': 'Something went wrong'
+                    })
+
+
+
+
+def stop_table(user, table_number, relay_id):
+    """
+    Handles turning off a table and processing billing logic.
+    """
+    try:
+        # Fetch the table and related user details
+        table = Table.objects.get(user=user, table_number=table_number)
+        local_owner = user
+        
+        # Fetch the current bill for the table
+        bill = Bill.objects.get(user=user, start_time=table.start_time)
+        time_now = timezone.now()
+        
+        # Set the table's end time and calculate duration
+        table.end_time = time_now
+        if table.start_time:
+            table.duration = table.end_time - table.start_time
+        else:
+            table.duration = timedelta(0)
+        
+        # Stop the table and reset attributes
+        table.state = 0  # Set state to stopped
+        bill.end_time = time_now
+        bill.duration = table.duration
+
+        # Use rate from the table or a default rate
+        if table.ratePmin:
+            rate = table.ratePmin
+        else:
+            rate = Rate.objects.get(id=0)
+            table.ratePmin = rate
+        
+        # Calculate billing
+        duration_minutes = math.ceil(table.duration.total_seconds() / 60)  # Convert to minutes
+        if duration_minutes > 0:
+            BillItem.objects.create(
+                user=local_owner,
+                bill=bill,
+                product_name='Table',
+                quantity=duration_minutes,
+                price=rate.per_minute_rate,
+            )
+        
+        # Reset the table fields
+        table.duration = None
+        table.start_time = None
+        table.set_time = None
+        table.total_billing = 0
+        table.end_time = None
+        table.current_bill = None
+        table.save()
+
+        # Save the bill changes
+        bill.save()
+
+        # Return success status for further processing (e.g., notifying ESP32)
+        return {
+            'status': 'success',
+            'message': 'Table turned off successfully',
+            'updated_state': table.state,
+        }
+    except Table.DoesNotExist:
+        return {'status': 'error', 'message': 'Table not found'}
+    except Bill.DoesNotExist:
+        return {'status': 'error', 'message': 'Bill not found'}
+    except Exception as e:
+        return {'status': 'error', 'message': f'An unexpected error occurred: {str(e)}'}
 
 
 """
@@ -1273,4 +1403,7 @@ versi kabel
     STILLLLLLLLL its fkn 4 AM
     6am. I think i fix it but its jangky AF if so. probably broken again tomorrow <O
     Lol do a fkn timer rework ffs
+    almost there lol... its been weeks,
+    remember to find a fix to remove old countdown. its 5.45 am 
+    I think I actually got it today. aw shit why did i type that... -00.48
 """

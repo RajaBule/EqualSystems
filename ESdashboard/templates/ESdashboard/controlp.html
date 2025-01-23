@@ -32,6 +32,7 @@
             </div>
         </div>
     </nav>
+   
     <div style="width: 50%;margin-left: 25%;"><button data-start-day-url="{% url 'start_day' %}" data-url="{% url 'set_all_relays_off' %}" id="startall" name="startall" class="btn btn-success d-block icon-button w-100" type="button" style="height: 58.4px;margin-top: 31px;margin-bottom: 31px;padding-top: 5.6px;background: var(--bs-success);"><i class="fa fa-power-off fs-1 text-dark"></i><span class="fs-2 text-dark" style="margin-bottom: 0px;padding-bottom: 0px;margin-top: 0px;">Mulai&nbsp;</span></button></div>
     <div id="start_check" data-day-started="{{ started }}" class="text-center" style="width: 100%;margin: 0px;margin-top: 5px;margin-bottom: 10px;">
         {% if day_started %}
@@ -41,7 +42,7 @@
         {% endif %}
             <div class="row text-center" style="margin-right: 0px;margin-top: 4px;">
                 {% for table in tables %}
-                    
+                
                 <div id="div-{{ table.table_number }}" 
                         class="col-md-3 text-center text-bg-dark"
                         style="
@@ -110,7 +111,7 @@
                         </div>
                         <div class="col text-center">
                             <label class="form-label" id="time-left-{{ table.table_number }}" style="margin-bottom: 0px;">Sisa:&nbsp;</label>
-                            <label id="timeleft-{{table.table_number}}" class="form-label" style="margin-bottom: 0px;">{{ table.set_time|default:"-" }}</label>
+                            <label id="timeleft-{{table.table_number}}" class="form-label" style="margin-bottom: 0px;">-</label>
                         </div>
                     </div>
                 </div>

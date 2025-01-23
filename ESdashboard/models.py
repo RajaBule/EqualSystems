@@ -39,7 +39,6 @@ class Table(models.Model):
     state = models.IntegerField(default=0)
     total_billing = models.DecimalField(max_digits=20, decimal_places=2)
     current_bill =  models.PositiveIntegerField(null=True, blank=True)
-
     def get_duration(self):
         if self.state == 1:
             duration = (timezone.now() - self.start_time).total_seconds()
@@ -98,6 +97,7 @@ class Bill(models.Model):
         default=0.00,
         help_text="Enter the percentage as a decimal value (e.g., 25.50 for 25.5%)."
     )
+    
     is_paid = models.BooleanField(default=False)
     customer_name = models.CharField(max_length=255, null=True, blank=True)  # Can be empty if not provided
     def __str__(self):

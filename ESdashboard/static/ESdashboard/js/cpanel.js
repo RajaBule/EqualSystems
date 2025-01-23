@@ -1,3 +1,19 @@
+function pauseAllIntervals() {
+    for (const id of activeIntervals) {
+        clearInterval(id);
+    }
+    timerinterval = null;
+    updateinterval = null;
+    console.log('All intervals paused');
+}
+
+
+function startInterval() {
+    timerinterval = setInterval(timerCheck, 60000);
+    updateinterval = setInterval(updateButtonData, 5000);
+    console.log("Interval started!");
+}
+
 function handleButtonClick(button) {
     const tableId = button.id;
     const relayId = button.getAttribute('data-relay-id');
@@ -166,7 +182,7 @@ function handleTableStateChange3(button) {
                 if (hours > 0 || minutes > 0) {
                     console.log(`Starting countdown: ${hours} hours, ${minutes} minutes`);
                     // Start the countdown based on user input
-                    startCountdown(tableId, totalTimeMs, startTime, "Start");
+                    //startCountdown(tableId, totalTimeMs, startTime, "Start");
                 } else {
                     console.log('No timer set, skipping countdown');
                 }
@@ -211,8 +227,8 @@ function handleTableStateChange3(button) {
 
 function handleTableStateChange2(button) {
     console.log("Button clicked:", button); // This should log the button element
+
     // Get data from the button
-    
     const tableId = button.getAttribute('data-table-id');
     const relayId = button.getAttribute('data-relay-id');
     const url = button.getAttribute('data-url');
@@ -220,85 +236,100 @@ function handleTableStateChange2(button) {
     const selectedRateId = button.getAttribute('data-selected-rate-id');
     const labelElement = document.getElementById(`timeleft-${tableId}`);
     const billId = button.getAttribute('data-bill-id');
-    console.log(tableName)
-    document.getElementById("modal-2-label").innerText = tableName;
     const billingLabel = document.getElementById(`live-billing-${tableId}`);
-    console.log(labelElement)
-    console.log(tableId, relayId)
+    const tablediv = document.getElementById(`div-${tableId}`);
+
+    console.log(tableName);
+    document.getElementById("modal-2-label").innerText = tableName;
+
     // Prepare the data to send via AJAX
     const data = {
         'table_id': tableId,
         'relay_id': relayId,
         'state': 0, // Stopping the table, state = 0
         'rate_id': selectedRateId,
-        'csrfmiddlewaretoken': '{{ csrf_token }}' // Ensure CSRF token is included for Django
+        'csrfmiddlewaretoken': '{{ csrf_token }}', // Ensure CSRF token is included for Django
     };
 
-    const tablediv = document.getElementById(`div-${tableId}`)
-    
-    console.log(data)    
-    // Send an AJAX POST request to update the state in the database
-    $.ajax({
-        type: "POST",
-        url: url, // The URL to the Django view that handles the state update
-        data: data,
-        success: function(response) {
-            console.log('successful POST')
-            // Update the state in the HTML (front-end) upon successful response
-            const tableElement = document.getElementById(tableId);
+    console.log(data);
 
-            // Use the updated state from the response
-            const updatedState = response.updated_state;
+    // Wrap the AJAX request in a Promise
+    const updateTableState = new Promise((resolve, reject) => {
+        $.ajax({
+            type: "POST",
+            url: url, // The URL to the Django view that handles the state update
+            data: data,
+            beforeSend: function() {
+                pauseAllIntervals();
+            },
+            success: function(response) {
+                console.log('successful POST');
 
-            // Update the state attribute in the document
-            tableElement.setAttribute('data-state', updatedState); 
-            tablediv.style = "height: 100%;width: 19.5%;border: 5.4px solid var(--bs-secondary-text-emphasis);margin-left: 5px;"
-            billingLabel.innerHTML = "Billing: 0";
-            // Change button content based on the updated state (0 = Open, 1 = In Use)
-            if (updatedState === 0) {
-                console.log('Table set to 0 state')
-            } else if (updatedState === 1) {
-                console.log('Table set to 1 state')
-            }
+                // Update the state in the HTML (front-end) upon successful response
+                const tableElement = document.getElementById(tableId);
+                const updatedState = response.updated_state;
 
-            document.getElementById(`${tableId}-time`).innerText = '-';
-            // Update the end_time and reset other relevant data as needed
-            document.getElementById(`timeleft-${tableId}`).innerText = '-';
-            // Close the modal
-            document.getElementById('hidden-close-button-stop').click();
-            labelElement.innerHTML = '-'
-            clearInterval(intervalIds[tableId]);
-            clearInterval(countdownIntervalid[tableId]);
+                tableElement.setAttribute('data-state', updatedState);
+                tablediv.style =
+                    "height: 100%;width: 19.5%;border: 5.4px solid var(--bs-secondary-text-emphasis);margin-left: 5px;";
+                billingLabel.innerHTML = "Billing: 0";
 
-            // Optionally, show a success message
-            alert('Table has been stopped successfully!');
-        },
-        error: function(xhr, status, error) {
-            // Handle errors if the request fails
-            console.log("Error stopping the table:", error);
-            alert('Failed to stop the table. Please try again.');
-        }
+                if (updatedState === 0) {
+                    console.log('Table set to 0 state');
+                } else if (updatedState === 1) {
+                    console.log('Table set to 1 state');
+                }
+
+                document.getElementById(`${tableId}-time`).innerText = '-';
+                document.getElementById(`timeleft-${tableId}`).innerText = '-';
+                document.getElementById('hidden-close-button-stop').click();
+                labelElement.innerHTML = '-';
+
+                clearInterval(intervalIds[tableId]);
+                clearInterval(countdownIntervalid[tableId]);
+
+                // Show success message
+                alert('Table has been stopped successfully!');
+
+                resolve(); // Resolve the promise when done
+            },
+            error: function(xhr, status, error) {
+                console.error("Error stopping the table:", error);
+                alert('Failed to stop the table. Please try again.');
+                reject(error); // Reject the promise on error
+            },
+        });
     });
 
-    fetch(`/print_receipt/${billId}/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),  // Ensure CSRF token is sent with the request
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Receipt printed successfully!');
-        } else {
-            alert('Failed to print the receipt.');
-        }
-    })
-    .catch(error => console.error('Error:', error));
+    // Use async/await to wait for the AJAX call to complete
+    (async () => {
+        try {
+            await updateTableState; // Wait for the AJAX request to complete
+            console.log("Table state updated. Proceeding to print receipt...");
 
-    location.reload();
+            // Send the fetch request to print the receipt
+            const response = await fetch(`/print_receipt/${billId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'), // Ensure CSRF token is sent with the request
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                startInterval();
+                alert('Receipt printed successfully!');
+            } else {
+                alert('Failed to print the receipt.');
+            }
+        } catch (error) {
+            console.error("An error occurred:", error);
+        }
+    })();
+    
 }
+
 
 function addTime(button) {
         const tableId = button.getAttribute('data-table-id')
@@ -365,8 +396,8 @@ function setTimeAfter(button) {
 
     const totalTimeMs = (hours * 60 * 60 * 1000) + (minutes * 60 * 1000);
     console.log('Table, StarTime, Hours, Minutes, TimeMS: ',tableId, startTime, hours, minutes, totalTimeMs)
-    addTimer(tableId, totalTimeMs,elapsedTimeMs,setTimeCheck,setTime);
-    location.reload();
+    saveTimerState(tableId, totalTimeMs);
+    
 }
 
 document.getElementById('startall').addEventListener('click', function() {
@@ -564,31 +595,27 @@ function updateTableDuration(tableId, startTime, tableState, ratePerMinute, bill
 // Countdown intervals mapped by tableId
 const countdownIntervalid = {};
 const countdownTimeRemaining = {}; // Store remaining time for each table
-
-function startCountdown(tableId, totalTimeMs, startTime, calledFrom) {
-    console.log("TABLE, TOTALTIMEMS, ST: ", tableId, totalTimeMs, startTime);
+function startCountdown(tableId, setTime, startTime) {
+    console.log("TABLE, SETTIME, STARTTIME: ", tableId, setTime, startTime);
 
     const labelElement = document.getElementById(`timeleft-${tableId}`);
     const button = document.getElementById(tableId);
-    const start = new Date(startTime);
+
+    const endTime = new Date(setTime); // Target end time
+    const start = new Date(startTime); // Start time
     const currentTime = new Date();
-    const elapsedTimeMs = currentTime - start;
 
-    let remainingTime = totalTimeMs - elapsedTimeMs;
+    // Calculate remaining time in milliseconds
+    let remainingTime = endTime - currentTime;
 
-    if (isNaN(start.getTime()) || isNaN(totalTimeMs)) {
+    // Handle invalid inputs
+    if (isNaN(endTime.getTime()) || isNaN(start.getTime())) {
         labelElement.innerHTML = "-";
         return;
     }
 
-    if (totalTimeMs === '' || startTime === '') {
-        labelElement.innerHTML = '-';
-        return; // Skip the countdown
-    }
-
     if (remainingTime <= 0) {
         labelElement.innerHTML = "Time's up!";
-        clearInterval(countdownIntervalid[tableId]);
         timeupStop(button);
         return;
     }
@@ -601,23 +628,26 @@ function startCountdown(tableId, totalTimeMs, startTime, calledFrom) {
             return;
         }
 
-        remainingTime -= 1000;
+        remainingTime -= 1000; // Decrement remaining time by 1 second
 
         const hours = Math.floor((remainingTime / (1000 * 60 * 60)) % 24);
         const minutes = Math.floor((remainingTime / (1000 * 60)) % 60);
         const seconds = Math.floor((remainingTime / 1000) % 60);
 
+        // Update label with formatted time
         labelElement.innerHTML = `${hours}h ${minutes}m ${seconds}s`;
 
-        // Save remaining time every minute
-        //if (remainingTime % 60000 === 0) {
-        //    saveTimerState(tableId, remainingTime);
-        //}
     }, 1000);
 }
 
-function saveTimerState(tableId, remainingTime, esTime) {
-    console.log(`Saving timer state for table ${tableId} with remaining time: ${remainingTime}`);
+
+function saveTimerState(tableId, setTime) {
+    console.log(`Saving timer state for table ${tableId}:  ${setTime}`);
+    if (countdownIntervalid[tableId]){
+        console.log("Old timer found, clearing now!");
+        clearInterval(countdownIntervalid[tableId]);
+        delete countdownIntervalid[tableId]; // Remove the reference
+       }
     fetch(`/update_timer/${tableId}/`, {
         method: "POST",
         headers: {
@@ -626,69 +656,14 @@ function saveTimerState(tableId, remainingTime, esTime) {
         },
         body: JSON.stringify({
             table_id: tableId,
-            additional_time: remainingTime,
-            esTime: esTime,
+            additional_time: setTime,
         })
     }).then(response => response.json())
       .then(data => {
           console.log("Timer state saved:", data);
+          //updateButtonData();
+          
       });
-}
-
-function addTimer(tableId, additionalTimeMs, elapsedTimeMs, setTimeCheck,setTime) {
-    console.log(`Adding ${additionalTimeMs}ms to table ${tableId}`);
-    console.log(countdownTimeRemaining[tableId])
-    Object.keys(countdownTimeRemaining).forEach(tableId => {
-        console.log(countdownTimeRemaining[tableId]);
-    });
-    
-    // Check if there's an existing countdown
-    if (setTimeCheck && countdownTimeRemaining[tableId]) {
-        console.log("TimeeCheck: ", setTimeCheck)
-        console.log("TimeRemaining: ", countdownTimeRemaining[tableId])
-        // Add time to the existing countdown, but don't subtract elapsed time
-        countdownTimeRemaining[tableId] += additionalTimeMs;
-        console.log(`NOT NULL: Updated countdown time remaining for table ${tableId}: ${countdownTimeRemaining[tableId]}ms`);
-        saveTimerState(tableId, additionalTimeMs, elapsedTimeMs=0);
-    }
-    else if (setTimeCheck && countdownTimeRemaining[tableId] == null) {
-        console.log("TimeeCheck: ", setTimeCheck);
-        console.log("TimeRemaining: ", countdownTimeRemaining[tableId]);
-        console.log("setTIme (raw): ", setTime);
-        console.log("ElapsedTimeMs: ", elapsedTimeMs);
-    
-        // Parse setTime into milliseconds
-        const timeParts = setTime.split(':'); // Split into [hours, minutes, seconds.milliseconds]
-        const hours = parseInt(timeParts[0]) || 0;
-        const minutes = parseInt(timeParts[1]) || 0;
-        const secondsMilliseconds = timeParts[2].split('.');
-        const seconds = parseInt(secondsMilliseconds[0]) || 0;
-        const milliseconds = parseInt(secondsMilliseconds[1]) || 0;
-    
-        const setTimeMs = (hours * 60 * 60 * 1000) + (minutes * 60 * 1000) + (seconds * 1000) + milliseconds;
-        console.log("Parsed setTimeMs: ", setTimeMs);
-    
-        // Perform the calculation
-        countdownTimeRemaining[tableId] = additionalTimeMs + setTimeMs + elapsedTimeMs;
-        console.log(`TIMECHECKOK: ${countdownTimeRemaining[tableId]} `);
-        console.log(`Updated countdown time remaining for table ${tableId}: ${countdownTimeRemaining[tableId]}ms`);
-        saveTimerState(tableId, additionalTimeMs, elapsedTimeMs=0);
-    }
-    
-    else if (setTimeCheck != true){
-        // Start a new countdown if one doesn't exist
-        countdownTimeRemaining[tableId] = additionalTimeMs + elapsedTimeMs;;
-        console.log(`NO SET TIME: Starting a new countdown for table ${tableId} with ${additionalTimeMs}ms`);
-        // Save the updated timer state to the backend
-        saveTimerState(tableId, additionalTimeMs, elapsedTimeMs);
-    }
-
-    // Always start a new interval or refresh the existing one
-    const currentTime = new Date();
-    startCountdown(tableId, countdownTimeRemaining[tableId], currentTime.toISOString(), "addTimer");
-
-    // Save the updated timer state to the backend
-    saveTimerState(tableId, additionalTimeMs, elapsedTimeMs);
 }
 
 // Set time times up function
@@ -704,55 +679,20 @@ function timeupStop(button) {
     console.log(tableName)
     console.log(labelElement)
     console.log(tableId, relayId)
-    // Prepare the data to send via AJAX
-    const data = {
-        'table_id': tableId,
-        'relay_id': relayId,
-        'state': 0, // Stopping the table, state = 0
-        'csrfmiddlewaretoken': '{{ csrf_token }}' // Ensure CSRF token is included for Django
-    };
-
-    // Send an AJAX POST request to update the state in the database
-    $.ajax({
-        type: "POST",
-        url: url, // The URL to the Django view that handles the state update
-        data: data,
-        success: function(response) {
-            console.log('successful POST')
-            // Update the state in the HTML (front-end) upon successful response
-            const tableElement = document.getElementById(tableId);
-
-            // Use the updated state from the response
-            const updatedState = response.updated_state;
-
-            // Update the state attribute in the document
-            tableElement.setAttribute('data-state', updatedState); 
-            
-            // Change button content based on the updated state (0 = Open, 1 = In Use)
-            if (updatedState === 0) {
-                console.log('Table set to 0 state')
-            } else if (updatedState === 1) {
-                console.log('Table set to 1 state')
-            }
-
-            document.getElementById(`${tableId}-time`).innerText = '-';
-            // Update the end_time and reset other relevant data as needed
-            document.getElementById(`timeleft-${tableId}`).innerText = '-';
-            // Close the modal
-            document.getElementById('hidden-close-button-stop').click();
-            labelElement.innerHTML = '-'
-            clearInterval(intervalIds[tableId]);
-            clearInterval(countdownIntervalid[tableId]);
-
-            // Optionally, show a success message
-            alert('Table has been stopped successfully!');
-        },
-        error: function(xhr, status, error) {
-            // Handle errors if the request fails
-            console.log("Error stopping the table:", error);
-            alert('Failed to stop the table. Please try again.');
-        }
-    });
+    document.getElementById(`${tableId}-time`).innerText = '-';
+    // Update the end_time and reset other relevant data as needed
+    document.getElementById(`timeleft-${tableId}`).innerText = '-';
+    // Close the modal
+    //document.getElementById('hidden-close-button-stop').click();
+    labelElement.innerHTML = '-'
+    clearInterval(intervalIds[tableId]);
+    clearInterval(countdownIntervalid[tableId]);
+    timerCheck();
+    //updateButtonData()
+    
+    // Optionally, show a success message
+    alert(`'Table ${tableId} has been stopped. (Time is up!)`);
+        
 }
 
 
@@ -827,7 +767,9 @@ function updateButtonData() {
             tables.forEach(table => {
                 const button = document.getElementById(table.table_number);
                 const div = document.getElementById(`div-${table.table_number}`);
+                const bill_label = document.getElementById(`live-billing-${table.table_number}`);
 
+                
                 if (button) {
                     button.setAttribute('data-relay-id', table.relay_id);
                     button.setAttribute('data-state', table.state);
@@ -835,7 +777,7 @@ function updateButtonData() {
                     button.setAttribute('data-bill-total', table.total_billing);
                     button.setAttribute('data-selected-rate-id', table.rate_id);
                     button.setAttribute('data-selected-ratepMin', table.rate_per_minute || '');
-                    button.setAttribute('data-settime', table.set_time);
+                    button.setAttribute('data-settime', table.set_time || null);
                     //button.setAttribute('data-start-table-url', table.start_table_url);
                     button.setAttribute('data-bill-id', table.bill_id);
                     button.setAttribute('data-unique-id', table.unique_id);
@@ -845,9 +787,23 @@ function updateButtonData() {
                     //    button.style.backgroundColor = 'var(--bs-form-valid-color)';
                     //    button.style.borderColor = 'var(--bs-form-valid-border-color)';
                     if (table.state === 0) {
+                        bill_label.textContent = 'Billing: 0'
                         button.style.backgroundColor = 'var(--bs-secondary)';
                         button.style.borderColor = 'var(--bs-secondary)';
                         div.style.border = '5.4px solid var(--bs-secondary-text-emphasis)';
+                    }
+
+                    if (table.state === 1 && table.set_time != null) {
+                        console.log('UPCALL!!!!: ', table.set_time)
+                        const setTime = table.set_time;
+                        const startTime = table.start_time;
+                        const duration = table.duration;
+                        if (setTime || startTime) {
+                            clearInterval(countdownIntervalid[table.table_number]);
+                            delete countdownIntervalid[table.table_number]; // Remove the reference
+                            //const totalTimeMs = setTime ? new Date(setTime) - new Date(startTime) : duration * 60 * 1000; // Fallback to duration if set_time is not set
+                            startCountdown(table.table_number, setTime, startTime);
+                        }
                     }
                 }
             });
@@ -857,5 +813,31 @@ function updateButtonData() {
         });
 }
 
+const activeIntervals = [];
 // Call the function periodically (e.g., every 5 seconds)
-setInterval(updateButtonData, 5000);
+let updateinterval = setInterval(updateButtonData, 5000);
+activeIntervals.push(updateinterval);
+function timerCheck() {
+    console.log("TimerCheck Call...")
+    // Fetch updated table data from the server
+    fetch('/api/get_count_downs/')  // Adjust the URL to match your endpoint
+        .then(response => response.json())
+        .then(data => {
+            // Check if the response contains the 'updated_state' key
+            if (data.updated_state !== undefined) {
+                console.log("Response has updated_state:", data.updated_state);
+                // Add logic for when updated_state is present
+                // For example:
+                updateButtonData()
+            } else {
+                console.log("Response does not have updated_state.");
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching count_down data:', error);
+        });
+}
+
+let timerinterval = setInterval(timerCheck, 60000);
+activeIntervals.push(timerinterval);
+

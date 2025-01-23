@@ -39,8 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'ESdashboard',
     'django.contrib.humanize',
-    'channels'
-]
+    'channels',
+    ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -131,3 +131,8 @@ AUTH_USER_MODEL = 'ESdashboard.CustomUser'
 
 LOGIN_URL = '/login/'  # This should match the URL pattern for your login view
 LOGIN_REDIRECT_URL = '/'  # Redirect after login, adjust as needed
+
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'  # This is the default Redis setup.
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'

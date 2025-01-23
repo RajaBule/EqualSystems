@@ -34,6 +34,29 @@
     </nav>
     <section class="py-5">
         <div class="container py-5">
+            <div class="container py-3">
+                <div class="row">
+                    <div class="col-md-6">
+                        <label for="timeframe" class="form-label">Select Timeframe:</label>
+                        <select id="timeframe" class="form-select">
+                            <option value="hourly">Hourly</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly" selected>Monthly</option>
+                            <option value="yearly">Yearly</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div id="custom-date-range" class="col-md-6 d-none">
+                        <label for="start_date" class="form-label">Start Date:</label>
+                        <input type="date" id="start_date" class="form-control">
+                        <label for="end_date" class="form-label mt-2">End Date:</label>
+                        <input type="date" id="end_date" class="form-control">
+                    </div>
+                </div>
+                <button id="updateChart" class="btn btn-primary mt-3">Update Chart</button>
+            </div>
+            
             <h1 class="text-center">This Year</h1>
             <div>
                 <canvas id="incomeChart" width="400" height="200"></canvas>
@@ -57,46 +80,7 @@
                 </div>
             </div>
         </div>
-        <div class="container" style="display: none;">
-            <h1 class="text-center" style="margin-top: 79px;">Analysis</h1>
         
-            <!-- Dropdown to choose time frame -->
-            <div class="dropdown d-inline-flex" style="width: 35%;margin-left: 59px;">
-                <button class="btn btn-primary btn-sm dropdown-toggle link-dark text-bg-primary border-dark d-table-row" aria-expanded="false" data-bs-toggle="dropdown" type="button" style="color: var(--bs-body-bg);background: var(--bs-secondary-text-emphasis);border: 0.8px solid var(--bs-secondary-text-emphasis);">
-                    Time Frame
-                </button>
-                <div class="dropdown-menu">
-                    <a class="dropdown-item link-primary" href="#" id="week">Week</a>
-                    <a class="dropdown-item link-primary" href="#" id="month">Month</a>
-                    <a class="dropdown-item link-primary" href="#" id="custom">Custom</a>
-                </div>
-            </div>
-        
-            <!-- Custom date picker for custom range -->
-            <input type="date" id="custom-start-date" style="width: 21%;color: #2d2c38;font-size: 16px;background: var(--bs-blue);text-align: right;padding: 0px;margin-left: 30%;border: 1.6px solid var(--bs-secondary-text-emphasis);">
-            <input type="date" id="custom-end-date" style="width: 21%;color: #2d2c38;font-size: 16px;background: var(--bs-blue);text-align: right;padding: 0px;margin-left: 5%;border: 1.6px solid var(--bs-secondary-text-emphasis);">
-        
-            <!-- Chart container -->
-            <div><canvas id="incomeChart2" data-bss-chart="{&quot;type&quot;:&quot;bar&quot;,&quot;data&quot;:{&quot;labels&quot;:[&quot;January&quot;,&quot;February&quot;,&quot;March&quot;,&quot;April&quot;,&quot;May&quot;,&quot;June&quot;],&quot;datasets&quot;:[{&quot;label&quot;:&quot;Revenue&quot;,&quot;backgroundColor&quot;:&quot;#2d2c38&quot;,&quot;borderColor&quot;:&quot;#19f5aa&quot;,&quot;borderWidth&quot;:&quot;2&quot;,&quot;data&quot;:[&quot;4500&quot;,&quot;5300&quot;,&quot;6250&quot;,&quot;7800&quot;,&quot;9800&quot;,&quot;15000&quot;]}]},&quot;options&quot;:{&quot;maintainAspectRatio&quot;:true,&quot;legend&quot;:{&quot;display&quot;:false,&quot;labels&quot;:{&quot;fontStyle&quot;:&quot;normal&quot;}}}}}"></canvas></div>
-        </div>
-        
-        <div class="row" style="margin-bottom: 26px;margin-top: 18px;margin-right: 0px;margin-left: 0px;width: 100%; display: none;">
-            <div class="col-md-6 text-center" style="margin-top: 5px;width: 50%;">
-                <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">Selected&nbsp;Income</h1><label class="form-label text-center text-success" style="font-size: 45px;margin-bottom: 0px;">100.790.000</label>
-            </div>
-            <div class="col-md-6 text-center" style="margin-top: 5px;width: 50%;">
-                <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">Closed Bills</h1><label class="form-label text-center text-primary" style="font-size: 45px;margin-bottom: 0px;">1980</label>
-            </div>
-        </div>
-        <div class="row" style="margin-bottom: 26px;margin-top: 18px;margin-right: 0px;margin-left: 0px;width: 100%;  display: none;">
-            <div class="col-md-6 text-center" style="margin-top: 5px;width: 50%;">
-                <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">High Time</h1><label class="form-label text-center text-warning" style="font-size: 45px;margin-bottom: 0px;">Saturday</label>
-            </div>
-            <div class="col-md-6 text-center" style="margin-top: 5px;width: 50%;">
-                <h1 class="text-center" style="margin-bottom: -10px;text-decoration: underline;margin-top: 5px;font-size: 26.116px;">Low Time</h1><label class="form-label text-center text-danger" style="font-size: 45px;margin-bottom: 0px;">Monday</label>
-            </div>
-        </div>
-    </section>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // Wait for the DOM to load
@@ -234,6 +218,71 @@
             }
         });
     </script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const timeframeSelect = document.getElementById('timeframe');
+        const customDateRange = document.getElementById('custom-date-range');
+        const updateChartButton = document.getElementById('updateChart');
+        const incomeChart = document.getElementById('incomeChart').getContext('2d');
+    
+        let chart; // To hold the chart instance
+    
+        // Show/hide custom date inputs
+        timeframeSelect.addEventListener('change', () => {
+            if (timeframeSelect.value === 'custom') {
+                customDateRange.classList.remove('d-none');
+            } else {
+                customDateRange.classList.add('d-none');
+            }
+        });
+    
+        // Fetch data and update the chart
+        updateChartButton.addEventListener('click', () => {
+            const timeframe = timeframeSelect.value;
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+    
+            fetch("{% url 'reports_data' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ timeframe, start_date: startDate, end_date: endDate })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const { labels, revenue } = data;
+    
+                // Update the chart
+                if (chart) chart.destroy(); // Destroy the previous chart
+                chart = new Chart(incomeChart, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Total Revenue',
+                            data: revenue,
+                            backgroundColor: '#2d2c38',
+                            borderColor: '#19f5aa',
+                            borderWidth: 2,
+                           // borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    });
+    </script>
+    
+
     <footer class="bg-dark"></footer>
     <script src="{% static 'ESdashboard/js/bootstrap.min.js' %}"></script>
     <script src="{% static 'ESdashboard/js/chart.min.js' %}"></script>

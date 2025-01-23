@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from ESdashboard import views
+from ESdashboard import views, tasks
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -53,4 +53,10 @@ urlpatterns = [
     path('update_timer/<int:table_id>/', views.update_timer, name='update_timer'),
     path('api/get_table_data/', views.get_table_data, name='get_table_data'),
     path('print-all-receipts/', views.print_all_receipts_view, name='print_all_receipts'),
+    path('api/get_count_downs/', views.count_downs, name='get_count_downs'),
+    path('get_sales_data/', views.get_sales_data, name='get_sales_data'),
+    path('test_reports/', views.test_report_view, name='test_report_view'),
+    path('admin_panel/add-category/', views.add_category, name='add_category'),
+    path('admin_panel/edit-category/<int:category_id>/', views.edit_category, name='edit_category'),
+    path('admin_panel/delete-category/<int:category_id>/', views.delete_category, name='delete_category'),
 ]
